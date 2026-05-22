@@ -110,6 +110,7 @@
     .layout { display: grid; gap: 16px; }
     .kpis { display: grid; gap: 12px; grid-template-columns: repeat(6, 1fr); }
     .panel,
+    #chat-page,
     #ai-dev-console,
     #assignment-trace-page,
     #genealogy-page {
@@ -239,6 +240,13 @@
     body.portfolio-page .layout > section:not(#candidate-portfolio) { display: none; }
     body.portfolio-page #candidate-portfolio { min-height: calc(100vh - 116px); }
     body.portfolio-page .portfolio-table { min-width: 1280px; }
+    #chat-page { display: none; }
+    body.chat-page-active .layout > section:not(#chat-page) { display: none; }
+    body.chat-page-active #chat-page {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-height: calc(100vh - 116px);
+    }
     #assignment-trace-page { display: none; }
     body.assignment-trace-page-active .layout > section:not(#assignment-trace-page) { display: none; }
     body.assignment-trace-page-active #assignment-trace-page { display: block; min-height: calc(100vh - 116px); }
@@ -260,6 +268,109 @@
     .ai-dev-wide { grid-column: 1 / -1; }
     .panel-lite { border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
     .compact-header { min-height: 38px; }
+    .chat-layout {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      min-height: 0;
+      padding: 12px;
+    }
+    .chat-thread {
+      align-content: start;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: grid;
+      gap: 10px;
+      max-height: calc(100vh - 288px);
+      min-height: 420px;
+      overflow: auto;
+      padding: 12px;
+    }
+    .chat-message {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      max-width: 900px;
+      padding: 10px;
+    }
+    .chat-message.user {
+      background: #edf5ff;
+      border-color: #bae6ff;
+      justify-self: end;
+    }
+    .chat-message.assistant {
+      background: var(--surface);
+      justify-self: start;
+    }
+    .chat-message.system {
+      background: #f6f2ff;
+      border-color: #e8daff;
+      justify-self: start;
+    }
+    .chat-message strong {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .chat-message p {
+      font-size: 13px;
+      line-height: 1.45;
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    .chat-tool-call {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+      padding: 8px;
+    }
+    .chat-tool-call span {
+      color: var(--text);
+      display: inline-block;
+      margin-top: 3px;
+      overflow-wrap: anywhere;
+    }
+    .chat-agent-trace {
+      border-left: 3px solid var(--accent);
+      color: var(--muted);
+      display: grid;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      gap: 3px;
+      margin-top: 8px;
+      padding-left: 8px;
+    }
+    .chat-context {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      min-width: 0;
+    }
+    .chat-examples {
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+    }
+    .chat-form {
+      align-items: end;
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 220px 110px 110px 86px minmax(0, 1fr) 96px;
+      padding: 12px;
+    }
+    .chat-form select { min-height: 40px; }
+    .chat-form textarea {
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      min-height: 72px;
+      padding: 10px;
+      resize: vertical;
+    }
     .policy-stack-grid { display: grid; gap: 8px; padding: 12px; }
     .policy-layer {
       background: var(--surface-alt);
@@ -334,6 +445,14 @@
       overflow-wrap: anywhere;
     }
     .experiment-table { min-width: 1180px; }
+    .agent-run-table { min-width: 1080px; }
+    .agent-run-detail-grid {
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr);
+      padding: 12px;
+    }
     .trace-search-grid {
       align-items: end;
       border-bottom: 1px solid var(--border);

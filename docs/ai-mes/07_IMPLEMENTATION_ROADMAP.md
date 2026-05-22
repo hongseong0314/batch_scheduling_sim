@@ -251,14 +251,20 @@ Future deliverables:
 
 Recommended next build order:
 
-1. Event-sourced WIP reconstruction independent of live simulator state.
-2. Scenario preset library and config controls for balanced/A-bottleneck/
+1. Move Agent Run V1 from in-memory retention to SQLite-backed durable storage
+   with replayable request/response payloads.
+2. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
+   packing quality.
+3. Add approval-gated write-tool contract for future L4/operator workflows,
+   keeping current `/mes#chat` default read-only.
+4. Event-sourced WIP reconstruction independent of live simulator state.
+5. Scenario preset library and config controls for balanced/A-bottleneck/
    B-bottleneck/stress experiments.
-3. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
-4. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
-5. Richer FeatureSnapshot and state diff indexing for every decision cycle.
-6. Quality/rework lineage records linked to task, recipe/APC, and equipment.
-7. Recipe/APC command endpoints and operator hold/release/approval workflows.
+6. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
+7. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
+8. Richer FeatureSnapshot and state diff indexing for every decision cycle.
+9. Quality/rework lineage records linked to task, recipe/APC, and equipment.
+10. Recipe/APC command endpoints and operator hold/release/approval workflows.
 
 ## Phase 9: Operator Workflow And Production Boundaries
 

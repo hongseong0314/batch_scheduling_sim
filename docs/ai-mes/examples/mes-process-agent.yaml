@@ -1,0 +1,66 @@
+name: MES Process AI
+version: 0.1.0
+schema: v1
+
+models:
+  - name: Gemma4 Remote
+    provider: ollama
+    model: gemma4:latest
+    apiBase: http://localhost:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+    defaultCompletionOptions:
+      reasoning: true
+      contextLength: 128000
+      maxTokens: 30000
+      temperature: 0.3
+      topP: 0.95
+      topK: 64
+      keepAlive: 30m
+    requestOptions:
+      timeout: 120
+      headers:
+        X-MES-Agent: process-chat
+  - name: OpenAI GPT-4.1 Mini
+    provider: openai
+    model: gpt-4.1-mini
+    apiBase: https://api.openai.com/v1
+    apiKey: $OPENAI_API_KEY
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+    defaultCompletionOptions:
+      maxTokens: 4096
+      temperature: 0.2
+      topP: 0.95
+    requestOptions:
+      timeout: 60
+      headers:
+        X-MES-Agent: process-chat
+      extraBodyProperties:
+        seed: 7
+  - name: Qwen2.5-Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b-base
+    apiBase: http://localhost:11434
+    roles:
+      - autocomplete
+    autocompleteOptions:
+      debounceDelay: 250
+      maxPromptTokens: 1024
+      onlyMyCode: true
+
+mcpServers:
+  - name: mes-process-tools
+    type: stdio
+    command: .venv/bin/python
+    args:
+      - -m
+      - src.mes.mcp.process_apc_server
+    cwd: .
+    env:
+      MES_PROCESS_TOOL_MODE: read_only
+    connectionTimeout: 15

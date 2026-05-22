@@ -9,6 +9,11 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from src.mes.domain import AIRecommendation
+from src.mes.agent_runtime.api import (
+    configure_process_chat_context,
+    router as process_chat_router,
+)
+from src.mes.process_tools.api import router as process_tools_router
 from src.mes.runtime.ai_dev import (
     ai_dev_candidate_portfolio,
     decision_cycles_payload,
@@ -54,6 +59,9 @@ from src.mes.ui.assets import control_room_html
 
 context = MESAPIContext()
 app = FastAPI(title="Manufacturing AI MES MVP API", version="0.2.0")
+configure_process_chat_context(context)
+app.include_router(process_chat_router)
+app.include_router(process_tools_router)
 
 
 @app.get("/", response_class=HTMLResponse)

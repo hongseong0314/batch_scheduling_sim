@@ -21,7 +21,8 @@ should start here.
 | 6 | [06_UI_CONTROL_ROOM_SPEC.md](06_UI_CONTROL_ROOM_SPEC.md) | Operational UI spec, visual rules, views, and data bindings |
 | 7 | [07_IMPLEMENTATION_ROADMAP.md](07_IMPLEMENTATION_ROADMAP.md) | Build phases, acceptance criteria, tests, and migration strategy |
 | 8 | [08_PRODUCT_UI_FOUNDATION_V1.md](08_PRODUCT_UI_FOUNDATION_V1.md) | Product UI foundation goals, open-design usage, and frontend acceptance criteria |
-| 9 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 9 | [09_PROCESS_APC_MCP_AGENT.md](09_PROCESS_APC_MCP_AGENT.md) | Process A APC tool-calling agent, MCP server, and read-only process model API |
+| 10 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -104,6 +105,15 @@ Implemented today:
 - API/UI: live simulator-backed MES endpoints and a dense `/mes` control room
   with Candidate Portfolio, Assignment Trace, AI Developer Console, Policy
   Experiment Runner, Product UI Foundation, and Digital Twin Genealogy V1.
+- Process APC/MES tool calling: read-only Process A APC prediction and MES
+  runtime inspection tools are exposed through `src/mes/process_tools/`,
+  `/api/v2/process-tools/*`, `src/mes/mcp/process_apc_server.py`, and the local
+  Continue-inspired `src/mes/agent_runtime/` runtime. The control room also
+  exposes `/mes#chat` for process-engineer natural-language MES/APC questions
+  with Agent Mode, Chat Mode, model selection, compact tool traces, and
+  `agent_run_id` records. `/mes#ai-dev` includes Agent Run Inspector for model,
+  prompt, tool-call, answer, and step-trace review. Runtime chat models are
+  configured in `config/mes-process-agent.yaml`.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

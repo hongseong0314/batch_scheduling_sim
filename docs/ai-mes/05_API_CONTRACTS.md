@@ -54,6 +54,10 @@ thin and delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/genealogy/lot/{lot_id}` | Run-scoped lot-level task and command rollout |
 | `GET /api/v2/execution-ledger/{correlation_id}` | Run-scoped command, rule, simulator-action, and post-state ledger |
 | `GET /api/v2/digital-twin/state-at?time=0` | Run-scoped replayable decision-state snapshot at or before time |
+| `GET /api/v2/process-tools/catalog` | Read-only process model tool catalog for LLM/MCP callers |
+| `GET /api/v2/process-chat/models` | Continue-style chat model catalog for process chat |
+| `GET /api/v2/agent-runs` | Recent Agent Mode and local fallback run records |
+| `GET /api/v2/agent-runs/{agent_run_id}` | Agent run detail with metadata, tool calls, and step trace |
 
 ## Current Mutation APIs
 
@@ -70,6 +74,8 @@ thin and delegate runtime behavior to `src/mes/runtime/*`.
 | `POST /api/v2/simulation/autoplay/start` | Enable autoplay |
 | `POST /api/v2/simulation/autoplay/stop` | Disable autoplay |
 | `GET /api/v2/simulation/autoplay/status` | Poll autoplay and optionally step |
+| `POST /api/v2/process-tools/{tool_id}/run` | Read-only process model inference with structured input |
+| `POST /api/v2/process-chat` | Process-engineer chat over read-only process tools with LLM/fallback mode |
 
 ## Current V2 Payload Summary
 
@@ -148,6 +154,115 @@ diagnostics.
             "linked_recommendation_ids": {"L4": "REC_...", "L3": "REC_..."},
             "command_status": "EXECUTED"
         }
+    ]
+}
+```
+
+`GET /api/v2/process-tools/catalog` lists process model tools that are safe for
+LLM/MCP use. `POST /api/v2/process-tools/{tool_id}/run` executes one read-only
+inference. The first implemented tool is `predict_process_a_apc`, backed by the
+Process A rule-based APC model.
+
+```python
+POST /api/v2/process-tools/predict_process_a_apc/run
+{
+    "task_rows": [{"task_uid": "T0", "spec_a": [48.0, 53.0]}],
+    "machine_state": {"u": 6, "m_age": 12},
+    "recipe": [10.0, 2.0, 1.0],
+    "current_time": 120
+}
+
+{
+    "tool_id": "predict_process_a_apc",
+    "stage": "A",
+    "model_id": "A_RULE_BASED_APC_PREDICTOR",
+    "read_only": True,
+    "recipe": [10.0, 2.0, 1.0],
+    "predicted_qa": 49.6646,
+    "quality_risk": "LOW",
+    "replace_consumable": True
+}
+```
+
+`POST /api/v2/process-chat` accepts a natural-language process/MES question and
+returns a chat answer plus any tool calls used. `use_llm=true` attempts the local
+Continue-inspired runtime first and falls back to the local A APC parser/tool
+when the model is unavailable. `use_llm=false` runs the local parser/tool
+directly. `mode=agent` runs a multi-step read-only tool loop; `mode=chat` sends
+one model request without tool execution. `max_steps` bounds Agent Mode.
+`model_name` may select any configured chat model by `name` or `model` id. V1
+supports `ollama` and `openai` providers. By default the runtime reads
+`config/mes-process-agent.yaml`; `MES_PROCESS_AGENT_CONFIG` can override this
+path. The model list is filtered to Continue `chat` role models. Continue
+`capabilities` are combined with provider/model autodetection; `tool_use`
+controls native tool-schema sending. Models without native `tool_use` use a
+system-message JSON tool fallback in Agent Mode.
+
+```python
+POST /api/v2/process-chat
+{
+    "message": "A 공정에서 spec_a 48~53이고 u=6, m_age=12, recipe=[10,2,1]이면 QA가 어떻게 나올까?",
+    "use_llm": False,
+    "model_name": "Gemma4 Remote",
+    "mode": "agent",
+    "max_steps": 5
+}
+
+{
+    "agent_run_id": "ARUN_...",
+    "mode": "local_process_tool",
+    "status": "completed",
+    "answer": "A 공정 APC 예측 결과 predicted_qa=49.6646...",
+    "tool_calls": [
+        {
+            "tool_name": "predict_process_a_apc",
+            "status": "executed",
+            "policy": "local_process_tool",
+            "result": {"stage": "A", "quality_risk": "LOW"}
+        }
+    ],
+    "agent_trace": []
+}
+```
+
+Agent Mode may return `mode="llm_agent"`, `status`, `agent_trace`, and multiple
+tool calls. The MES API process registers these read-only tools for Agent Mode:
+`predict_process_a_apc`, `get_fab_snapshot`, `get_policy_stack`,
+`get_candidate_portfolio_latest`, `get_equipment_detail`, and
+`get_assignment_trace`. Non-read-only or unknown tool calls are rejected with
+`status="policy_blocked"` and `policy="excluded"`.
+
+`GET /api/v2/agent-runs` and `GET /api/v2/agent-runs/{agent_run_id}` expose the
+inspection record created by each chat request. V1 stores recent runs in memory
+inside the API process.
+
+```python
+GET /api/v2/agent-runs/{agent_run_id}
+{
+    "found": True,
+    "agent_run_id": "ARUN_...",
+    "mes_run_id": "RUN_...",
+    "question": "현재 fab 상태와 active policy stack을 보고 병목을 설명해줘",
+    "mode": "agent",
+    "status": "completed",
+    "answer": "A 공정이 병목입니다...",
+    "tool_count": 2,
+    "step_count": 5,
+    "metadata": {
+        "model_name": "gemma4:latest",
+        "provider": "ollama",
+        "max_steps": 5,
+        "prompt_id": "MES_AGENT_SYSTEM_PROMPT",
+        "prompt_version": "0.1.0",
+        "tool_catalog_version": "mes-agent-tools-v1",
+        "requested_think": True
+    },
+    "tool_calls": [
+        {"tool_name": "get_fab_snapshot", "status": "executed"}
+    ],
+    "agent_trace": [
+        {"type": "llm_response", "step": 1, "tool_call_count": 1},
+        {"type": "tool_call", "step": 1, "tool_name": "get_fab_snapshot"}
     ]
 }
 ```

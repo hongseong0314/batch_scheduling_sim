@@ -18,6 +18,7 @@ from src.mes.agent_runtime.config import (
 from src.mes.agent_runtime.factory import build_runtime_from_config, select_model
 from src.mes.agent_runtime.mes_tools import MESAgentToolService
 from src.mes.agent_runtime.run_store import AgentRunStore
+from src.mes.agent_runtime.sqlite_run_store import SQLiteAgentRunStore
 from src.mes.process_tools.service import ProcessToolService
 
 
@@ -41,12 +42,13 @@ class ProcessChatService:
             runtime_context,
             process_tools=self.process_tools,
         )
-        self.agent_runs = AgentRunStore()
+        self.agent_runs = _agent_run_store_for_context(runtime_context)
 
     def set_runtime_context(self, runtime_context: Any) -> None:
         self.runtime_context = runtime_context
         if isinstance(self.tool_service, MESAgentToolService):
             self.tool_service.context = runtime_context
+        self.agent_runs = _agent_run_store_for_context(runtime_context)
 
     def ask(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
         message = str(payload.get("message", "") or "").strip()
@@ -301,3 +303,11 @@ def _mes_run_id(runtime_context: Any | None) -> str:
         return str(direct)
     store = getattr(getattr(runtime_context, "harness", None), "store", None)
     return str(getattr(store, "current_run_id", "") or "")
+
+
+def _agent_run_store_for_context(runtime_context: Any | None) -> AgentRunStore:
+    store = getattr(runtime_context, "store", None)
+    db_path = getattr(store, "db_path", None)
+    if db_path:
+        return SQLiteAgentRunStore(db_path)
+    return AgentRunStore()

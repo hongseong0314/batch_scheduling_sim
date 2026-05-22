@@ -11,14 +11,10 @@ from src.mes.runtime.common import (
     task_label,
 )
 from src.mes.runtime.live_state import stage_summary
+from src.mes.runtime.naming import equipment_display_name, stage_display_name
 
 
 def flow_summary(context: Any, decision_state: Dict[str, Any]) -> List[Dict[str, Any]]:
-    labels = {
-        "A": "Process QA",
-        "B": "Clean QA",
-        "C": "Packing",
-    }
     summaries = []
     for stage in STAGES:
         summary = stage_summary(context, stage, decision_state)
@@ -28,7 +24,7 @@ def flow_summary(context: Any, decision_state: Dict[str, Any]) -> List[Dict[str,
         summaries.append(
             {
                 "stage": stage,
-                "label": labels[stage],
+                "label": stage_display_name(context, stage),
                 "equipment_count": equipment_count,
                 "running": running,
                 "idle": int(summary["idle"]),
@@ -203,7 +199,13 @@ def planned_gantt_bars(context: Any, decision_state: Dict[str, Any]) -> List[Dic
     return bars
 
 
-def gantt_rows(decision_state: Dict[str, Any]) -> List[Dict[str, Any]]:
+def gantt_rows(
+    context: Any,
+    decision_state: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    if decision_state is None:
+        decision_state = context
+        context = None
     rows = []
     for stage in STAGES:
         machines = decision_state.get(stage, {}).get("machines", {})
@@ -213,8 +215,10 @@ def gantt_rows(decision_state: Dict[str, Any]) -> List[Dict[str, Any]]:
                     "row_id": f"{stage}:{equipment_id}",
                     "stage": stage,
                     "machine_id": str(equipment_id),
-                    "label": str(equipment_id),
-                    "display_stage": stage,
+                    "label": equipment_display_name(context, equipment_id),
+                    "equipment_id": str(equipment_id),
+                    "display_name": equipment_display_name(context, equipment_id),
+                    "display_stage": stage_display_name(context, stage),
                     "row_type": "equipment",
                 }
             )
@@ -347,7 +351,7 @@ def gantt_state(context: Any, lookback: int = 36, lookahead: int = 12) -> Dict[s
         bars.extend(event_to_gantt_bars(context, stage, now))
     bars.extend(planned_gantt_bars(context, decision_state))
     bars = attach_assignment_trace_keys(context, bars)
-    rows = gantt_rows(decision_state)
+    rows = gantt_rows(context, decision_state)
     horizon = gantt_horizon(now, lookback=lookback, lookahead=lookahead)
     visible_bars = filter_bars_for_horizon(bars, horizon)
     return {

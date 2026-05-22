@@ -283,7 +283,13 @@ Current implementation:
   metadata, and a compact agent trace.
 - Agent Run Inspector shows recent `agent_run_id` records, model/provider,
   status, question, final answer, tool calls, requested think mode, prompt
-  version, and step timeline from `/api/v2/agent-runs`.
+  version, and step timeline from `/api/v2/agent-runs`. In the MES API process,
+  these records are backed by SQLite so the inspector can survive server
+  restarts.
+- Stage and equipment naming is configurable as display metadata. UI surfaces
+  should render `stage_display_names` and `equipment_display_names` where
+  present, while keeping canonical ids available for trace search, command
+  payloads, and developer debugging.
 - Policy Experiment Runner captures the current fab state as a scenario, lets
   AI developers select policy variants, replays each variant offline, and shows
   selected stage/candidate, local score, upper score, L2 risk, command validity,
@@ -346,7 +352,7 @@ Avoid vague phrases:
 | Assignment trace | `/api/v2/assignment-trace`, `/api/v2/gantt` trace keys | same plus richer persisted genealogy linkage |
 | Genealogy | `/api/v2/runs`, `/api/v2/ledger-index/{index_name}`, `/api/v2/genealogy/task/{task_uid}`, `/api/v2/genealogy/equipment/{equipment_id}`, `/api/v2/genealogy/lot/{lot_id}`, `/api/v2/execution-ledger/{correlation_id}`, `/api/v2/digital-twin/state-at` | event-sourced reconstruction |
 | AI developer console | `/api/v2/ai-dev/policy-stack`, `/api/v2/ai-dev/decision-cycles`, `/api/v2/ai-dev/candidate-portfolio/{correlation_id}`, `/api/v2/ai-dev/scenarios`, `/api/v2/ai-dev/policy-variants`, `/api/v2/ai-dev/experiments/*` | same plus scenario preset library |
-| Process chat | `/api/v2/process-chat`, `/api/v2/process-tools/catalog`, `/api/v2/process-tools/{tool_id}/run`, `/api/v2/agent-runs` | same plus B APC, C packing tools, persistent run storage, and optional approval-gated write tools |
+| Process chat | `/api/v2/process-chat`, `/api/v2/process-tools/catalog`, `/api/v2/process-tools/{tool_id}/run`, `/api/v2/agent-runs` | same plus B APC, C packing tools, and optional approval-gated write tools |
 | Decision chain | `/api/v2/decision-chain/{correlation_id}` | same with portfolio metadata |
 | Rule gate | `/api/v1/rules/validate` | same plus layer consistency reasons |
 | Command preview | `/api/v1/commands/track-in/preview` | `/api/v1/commands/finalize` |

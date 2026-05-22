@@ -111,9 +111,13 @@ Implemented today:
   Continue-inspired `src/mes/agent_runtime/` runtime. The control room also
   exposes `/mes#chat` for process-engineer natural-language MES/APC questions
   with Agent Mode, Chat Mode, model selection, compact tool traces, and
-  `agent_run_id` records. `/mes#ai-dev` includes Agent Run Inspector for model,
-  prompt, tool-call, answer, and step-trace review. Runtime chat models are
-  configured in `config/mes-process-agent.yaml`.
+  SQLite-backed `agent_run_id` records. `/mes#ai-dev` includes Agent Run
+  Inspector for model, prompt, tool-call, answer, and step-trace review.
+  Runtime chat models are configured in `config/mes-process-agent.yaml`.
+- Display naming: canonical simulator ids (`A`, `B`, `C`, `A_0`, `B_0`,
+  `C_0`) remain state/action keys, while `stage_display_names` and
+  `equipment_display_names` provide configurable process/tool names for UI and
+  API display payloads.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

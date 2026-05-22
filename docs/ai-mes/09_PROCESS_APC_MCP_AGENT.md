@@ -111,6 +111,7 @@ Compatibility details:
 | `src/mes/agent_runtime/agent_loop.py` | Multi-step Agent/Chat loop, tool policy, and final response generation |
 | `src/mes/agent_runtime/process_chat.py` | Chat facade with LLM mode and local A APC fallback |
 | `src/mes/agent_runtime/run_store.py` | Recent agent run records for inspector/debug APIs |
+| `src/mes/agent_runtime/sqlite_run_store.py` | SQLite-backed agent run persistence for MES API runtime |
 | `src/mes/agent_runtime/eval.py` | Deterministic eval helper for tool-use and policy checks |
 | `src/mes/agent_runtime/cli.py` | Local CLI entrypoint |
 
@@ -198,8 +199,11 @@ Every chat request creates an `agent_run_id`. The run record stores:
 - tool calls,
 - compact step trace.
 
-V1 stores recent run records in memory. The next production step is moving this
-record to SQLite so agent runs survive process restarts.
+When the chat service runs inside the MES API process, these records are stored
+in the same local SQLite file as the MES runtime (`MES_DB_PATH`, default
+`data/mes_mvp.sqlite3`) through `SQLiteAgentRunStore`. Standalone service usage
+without an MES runtime context keeps the in-memory store for tests and local
+tooling.
 
 `POST /api/v2/process-chat` is the UI-facing chat endpoint. It accepts a
 natural-language message, `mode`, `max_steps`, and optional `use_llm` flag. With
@@ -238,6 +242,29 @@ opens `/mes#chat` and renders:
 The AI Developer Console also includes Agent Run Inspector. It lists recent
 agent runs from `/api/v2/agent-runs`, lets developers select one run, and shows
 the final answer, metadata, tool calls, and step timeline.
+
+## Process And Equipment Display Names
+
+The simulator still uses canonical stage keys and equipment ids (`A`, `B`, `C`,
+`A_0`, `B_0`, `C_0`) for state/action contracts. Human-readable names are now a
+runtime display layer:
+
+```python
+{
+  "stage_display_names": {
+    "A": "Process QA",
+    "B": "Clean QA",
+    "C": "Packing"
+  },
+  "equipment_display_names": {
+    "A_0": "Lithography Tool 01"
+  }
+}
+```
+
+`src/mes/runtime/naming.py` resolves these names for live state, Gantt payloads,
+and equipment detail payloads. This keeps policy/action contracts stable while
+allowing future semiconductor process names and real tool names in the UI.
 
 ## Agent Eval V1
 

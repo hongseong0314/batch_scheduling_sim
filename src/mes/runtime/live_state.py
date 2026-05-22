@@ -7,6 +7,7 @@ from typing import Any, Dict
 from src.mes.runtime.common import STAGES
 from src.mes.runtime.candidate_portfolio import latest_candidate_portfolio
 from src.mes.runtime.decision_trace import decision_chain, latest_correlation_id
+from src.mes.runtime.naming import equipment_display_name, stage_display_name
 
 
 def mes_state(context: Any) -> Dict[str, Any]:
@@ -34,6 +35,7 @@ def stage_summary(context: Any, stage: str, decision_state: Dict[str, Any]) -> D
         machines.append(
             {
                 "equipment_id": str(equipment_id),
+                "display_name": equipment_display_name(context, equipment_id),
                 "stage": stage,
                 "status": status,
                 "current_batch_uids": list(machine.get("current_batch_uids", [])),
@@ -45,11 +47,7 @@ def stage_summary(context: Any, stage: str, decision_state: Dict[str, Any]) -> D
     rework = len(stage_state.get("rework_pool_uids", []))
     incoming = len(stage_state.get(incoming_key, [])) if stage != "A" else 0
     return {
-        "label": {
-            "A": "Process QA",
-            "B": "Clean QA",
-            "C": "Packing",
-        }[stage],
+        "label": stage_display_name(context, stage),
         "wait": wait,
         "incoming": incoming,
         "rework": rework,

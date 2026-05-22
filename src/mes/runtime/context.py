@@ -26,6 +26,12 @@ def build_default_env() -> ManufacturingEnv:
             "process_time_B": 8,
             "process_time_C": 2,
             "deterministic_mode": True,
+            "stage_display_names": {
+                "A": "Process QA",
+                "B": "Clean QA",
+                "C": "Packing",
+            },
+            "equipment_display_names": {},
         }
     )
     env.reset(seed=11)

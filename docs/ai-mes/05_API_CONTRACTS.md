@@ -233,8 +233,10 @@ tool calls. The MES API process registers these read-only tools for Agent Mode:
 `status="policy_blocked"` and `policy="excluded"`.
 
 `GET /api/v2/agent-runs` and `GET /api/v2/agent-runs/{agent_run_id}` expose the
-inspection record created by each chat request. V1 stores recent runs in memory
-inside the API process.
+inspection record created by each chat request. In the MES API process these
+records are SQLite-backed through the runtime database path, so recent Agent
+Mode and local fallback runs survive process restarts. Standalone chat service
+usage without a runtime context may still use the in-memory store.
 
 ```python
 GET /api/v2/agent-runs/{agent_run_id}
@@ -266,6 +268,22 @@ GET /api/v2/agent-runs/{agent_run_id}
     ]
 }
 ```
+
+Process and equipment naming is display metadata, not a state/action key
+replacement. Live state, Gantt rows, and equipment detail payloads can include:
+
+```python
+{
+    "stage": "A",
+    "label": "Lithography QA",
+    "equipment_id": "A_0",
+    "display_name": "Lithography Tool 01"
+}
+```
+
+Canonical ids (`A`, `B`, `C`, `A_0`, `B_0`, `C_0`) remain the values used for
+policy decisions, Rule Engine validation, command payloads, and simulator
+actions.
 
 `GET /api/v2/ai-dev/policy-stack` returns the active factory-built stack:
 

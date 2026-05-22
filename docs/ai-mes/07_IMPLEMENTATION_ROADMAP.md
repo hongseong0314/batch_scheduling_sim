@@ -225,7 +225,10 @@ Deliverables:
 - reset that preserves prior genealogy under prior run ids,
 - normalized SQLite index tables for runs, tasks, lots, assignments,
   equipment timeline, commands, events, state snapshots, and genealogy edges,
-- direct `/api/v2/ledger-index/{index_name}` developer index query API.
+- direct `/api/v2/ledger-index/{index_name}` developer index query API,
+- SQLite-backed Agent Run records for `/mes#chat` and Agent Run Inspector,
+- configurable process/equipment display names while preserving canonical
+  simulator ids.
 
 Acceptance:
 
@@ -251,20 +254,18 @@ Future deliverables:
 
 Recommended next build order:
 
-1. Move Agent Run V1 from in-memory retention to SQLite-backed durable storage
-   with replayable request/response payloads.
-2. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
+1. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
    packing quality.
-3. Add approval-gated write-tool contract for future L4/operator workflows,
+2. Add approval-gated write-tool contract for future L4/operator workflows,
    keeping current `/mes#chat` default read-only.
-4. Event-sourced WIP reconstruction independent of live simulator state.
-5. Scenario preset library and config controls for balanced/A-bottleneck/
+3. Event-sourced WIP reconstruction independent of live simulator state.
+4. Scenario preset library and config controls for balanced/A-bottleneck/
    B-bottleneck/stress experiments.
-6. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
-7. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
-8. Richer FeatureSnapshot and state diff indexing for every decision cycle.
-9. Quality/rework lineage records linked to task, recipe/APC, and equipment.
-10. Recipe/APC command endpoints and operator hold/release/approval workflows.
+5. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
+6. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
+7. Richer FeatureSnapshot and state diff indexing for every decision cycle.
+8. Quality/rework lineage records linked to task, recipe/APC, and equipment.
+9. Recipe/APC command endpoints and operator hold/release/approval workflows.
 
 ## Phase 9: Operator Workflow And Production Boundaries
 

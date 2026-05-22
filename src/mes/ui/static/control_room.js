@@ -265,9 +265,13 @@
       document.getElementById("nav-eqp").textContent = String(items.length);
       document.getElementById("equipment-body").innerHTML = items.map(eq => {
         const detailEnabled = ["A", "B", "C"].includes(String(eq.stage || "").toUpperCase());
+        const equipmentLabel = eq.display_name || eq.equipment_id;
+        const equipmentTitle = eq.display_name && eq.display_name !== eq.equipment_id
+          ? `${eq.display_name} · ${eq.equipment_id}`
+          : eq.equipment_id;
         const equipmentCell = detailEnabled
-          ? `<button class="link-button machine-link" type="button" data-equipment-id="${escapeText(eq.equipment_id)}"><code>${escapeText(eq.equipment_id)}</code></button>`
-          : `<code>${escapeText(eq.equipment_id)}</code>`;
+          ? `<button class="link-button machine-link" type="button" data-equipment-id="${escapeText(eq.equipment_id)}" title="${escapeText(equipmentTitle)}"><code>${escapeText(equipmentLabel)}</code></button>`
+          : `<code title="${escapeText(equipmentTitle)}">${escapeText(equipmentLabel)}</code>`;
         return `
         <tr class="${detailEnabled ? "selectable" : ""}" data-equipment-id="${escapeText(eq.equipment_id)}">
           <td>${equipmentCell}</td><td>${eq.stage}</td>
@@ -326,8 +330,9 @@
       empty.hidden = true;
       content.hidden = false;
       document.getElementById("nav-machine").textContent = detail.equipment_id;
+      const detailName = detail.display_name || detail.equipment_id;
       document.getElementById("machine-subtitle").textContent =
-        `${detail.equipment_id} · ${detail.process_label} · ${detail.status}`;
+        `${detailName} · ${detail.process_label} · ${detail.status}`;
       document.getElementById("machine-axis").textContent =
         `${detail.apc?.quality_axis?.x || "step"} × ${detail.apc?.quality_axis?.y || "quality"}`;
       renderMachineKpis(detail);

@@ -1,7 +1,7 @@
 # Implementation Roadmap
 
 Status: canonical  
-Last updated: 2026-05-15
+Last updated: 2026-05-23
 
 ## Guiding Principle
 
@@ -250,22 +250,58 @@ Future deliverables:
 - explicit quality/rework lineage records,
 - durable genealogy queries across process restarts.
 
+## Phase 8.5: Operation Registry And Action Proposal Boundary
+
+Status: implemented for V1 production-transition contracts.
+
+Deliverables:
+
+- operation/equipment registry in `src/mes/operations/registry.py`,
+- default A/B/C simulator operations registered from runtime config,
+- configurable operation insertion path for future production process steps,
+- registry-backed stage/equipment display naming,
+- `GET /api/v2/operations` registry API,
+- Action Proposal DTOs in `src/mes/action_proposals.py`,
+- `GET /api/v2/action-proposals` API derived from validated commands,
+- explicit `direct_equipment_control=false` production boundary.
+
+Acceptance:
+
+- A/B/C remain compatible with simulator state/action keys,
+- real operations can be represented without changing environment physics,
+- AI-generated commands can be projected as legacy-safe proposals,
+- proposal records link back to correlation id, candidate id, command id, target
+  equipment, target units, and L1/L2 recommendation ids.
+
+Future deliverables:
+
+- source key mapping from legacy MES/RMS/FDC/APC/ERP ids,
+- proposal lifecycle persistence: submitted, accepted, modified, rejected,
+  expired, executed,
+- actual legacy assignment/outcome records linked by `proposal_id`,
+- production outbox adapter and operator approval queue,
+- operation registry loading from route/equipment master data.
+
 ## Next Priorities
 
 Recommended next build order:
 
-1. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
-   packing quality.
-2. Add approval-gated write-tool contract for future L4/operator workflows,
-   keeping current `/mes#chat` default read-only.
+1. Source key mapping and legacy-safe ingestion contracts for operation,
+   equipment, lot, unit, recipe, assignment, and quality records.
+2. Proposal lifecycle records that capture legacy MES accept/modify/reject and
+   actual execution outcome for each Action Proposal.
 3. Event-sourced WIP reconstruction independent of live simulator state.
-4. Scenario preset library and config controls for balanced/A-bottleneck/
+4. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
+   packing quality.
+5. Add approval-gated write-tool contract for future L4/operator workflows,
+   keeping current `/mes#chat` default read-only.
+6. Scenario preset library and config controls for balanced/A-bottleneck/
    B-bottleneck/stress experiments.
-5. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
-6. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
-7. Richer FeatureSnapshot and state diff indexing for every decision cycle.
-8. Quality/rework lineage records linked to task, recipe/APC, and equipment.
-9. Recipe/APC command endpoints and operator hold/release/approval workflows.
+7. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
+8. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
+9. Richer FeatureSnapshot and state diff indexing for every decision cycle.
+10. Quality/rework lineage records linked to task, recipe/APC, and equipment.
+11. Recipe/APC command endpoints and operator hold/release/approval workflows.
 
 ## Phase 9: Operator Workflow And Production Boundaries
 

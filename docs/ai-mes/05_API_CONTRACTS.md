@@ -1,7 +1,7 @@
 # API Contracts
 
 Status: canonical  
-Last updated: 2026-05-17
+Last updated: 2026-05-23
 
 ## Purpose
 
@@ -19,6 +19,8 @@ thin and delegate runtime behavior to `src/mes/runtime/*`.
 | decision-chain traceability | `src/mes/runtime/decision_trace.py` |
 | assignment and genealogy traceability | `src/mes/runtime/assignment_trace.py`, `src/mes/runtime/genealogy.py` |
 | AI developer console payloads | `src/mes/runtime/ai_dev.py` |
+| operation registry and action proposal routes | `src/mes/runtime/production_boundary_api.py`, `src/mes/runtime/operations.py`, `src/mes/operations/registry.py` |
+| run and ledger index routes | `src/mes/runtime/run_ledger_api.py`, `src/mes/runtime/run_ledger.py` |
 | equipment detail | `src/mes/runtime/equipment_detail.py` |
 | Gantt state | `src/mes/runtime/gantt.py` |
 
@@ -48,6 +50,8 @@ thin and delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/gantt` | Gantt rows, bars, stage views, and horizon |
 | `GET /api/v2/fab/live` | Live control-room state |
 | `GET /api/v2/runs` | Current and historical local simulator run/session index |
+| `GET /api/v2/operations` | Operation and equipment registry for simulator and future production process mapping |
+| `GET /api/v2/action-proposals` | Legacy-safe action proposals derived from validated MES commands |
 | `GET /api/v2/ledger-index/{index_name}` | Run-scoped normalized SQLite index rows |
 | `GET /api/v2/genealogy/task/{task_uid}` | Run-scoped task/wafer lineage with assignments, command links, and simulator events |
 | `GET /api/v2/genealogy/equipment/{equipment_id}` | Run-scoped equipment command and process timeline |
@@ -284,6 +288,80 @@ replacement. Live state, Gantt rows, and equipment detail payloads can include:
 Canonical ids (`A`, `B`, `C`, `A_0`, `B_0`, `C_0`) remain the values used for
 policy decisions, Rule Engine validation, command payloads, and simulator
 actions.
+
+`GET /api/v2/operations` returns the active operation/equipment registry. A/B/C
+are default simulator operations today, but the contract is shaped for future
+production operations loaded from route and equipment master data.
+
+```python
+{
+    "source": "operation_registry",
+    "canonical_id_policy": "operation_id_and_equipment_id_are_stable_contract_keys",
+    "count": 3,
+    "equipment_count": 11,
+    "items": [
+        {
+            "operation_id": "A",
+            "display_name": "Process QA",
+            "operation_type": "process_qa",
+            "equipment_group_id": "A",
+            "execution_boundary": "SIMULATOR_STAGE",
+            "upstream_operation_ids": [],
+            "downstream_operation_ids": ["B"],
+            "batch_size": 3,
+            "process_time": 20,
+            "l1_policy_key": "scheduler_A",
+            "l2_policy_key": "tuner_A",
+            "legacy_submission_mode": "SIMULATOR_ONLY"
+        }
+    ],
+    "equipment": [
+        {
+            "equipment_id": "A_0",
+            "display_name": "A_0",
+            "equipment_group_id": "A",
+            "capable_operations": ["A"],
+            "batch_size": 3,
+            "execution_boundary": "SIMULATOR_STAGE"
+        }
+    ]
+}
+```
+
+`GET /api/v2/action-proposals` returns production-facing proposal envelopes
+derived from validated `MESCommand` records. Optional `correlation_id` and
+`run_id` query parameters filter the result. The contract intentionally says the
+AI layer is proposing an action to legacy MES, not directly driving equipment.
+
+```python
+{
+    "count": 1,
+    "correlation_id": "CORR_...",
+    "run_id": "RUN_...",
+    "items": [
+        {
+            "proposal_id": "PROP_CMD_...",
+            "proposal_type": "LEGACY_MES_ACTION_PROPOSAL",
+            "correlation_id": "CORR_...",
+            "operation_id": "A",
+            "source_command_id": "CMD_...",
+            "source_command_type": "RESERVE_AND_TRACK_IN",
+            "validation_status": "PASSED",
+            "status": "PROPOSED",
+            "candidate_id": "CAND_A_...",
+            "target_equipment_id": "A_0",
+            "target_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+            "policy_refs": {
+                "dispatch_recommendation_id": "REC_L1_...",
+                "recipe_recommendation_id": "REC_L2_..."
+            },
+            "legacy_submission_mode": "SIMULATOR_ONLY",
+            "direct_equipment_control": False,
+            "payload": {"stage": "A", "task_uids": [1, 2, 3]}
+        }
+    ]
+}
+```
 
 `GET /api/v2/ai-dev/policy-stack` returns the active factory-built stack:
 

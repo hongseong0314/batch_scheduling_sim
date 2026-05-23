@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 from src.environment.manufacturing_env import ManufacturingEnv
 from src.mes import MESDevelopmentHarness
+from src.mes.operations.registry import build_default_operation_registry
 from src.mes.recommendations import make_id
 from src.mes.sqlite_store import SQLiteMESStore
 
@@ -47,6 +48,7 @@ class MESAPIContext:
 
     def __init__(self) -> None:
         self.env = build_default_env()
+        self.operation_registry = build_default_operation_registry(self.env.config)
         self.store = SQLiteMESStore(default_db_path())
         self.store.clear_runtime_state()
         self.run_id = ""
@@ -64,6 +66,7 @@ class MESAPIContext:
 
     def reset_runtime(self) -> None:
         self.env = build_default_env()
+        self.operation_registry = build_default_operation_registry(self.env.config)
         self.store.clear_runtime_state()
         self._start_new_run("reset")
         self.autoplay_enabled = False
@@ -84,6 +87,9 @@ class MESAPIContext:
             metadata={
                 "sequence": self._run_sequence,
                 "config": dict(self.env.config),
+                "operation_registry": self.operation_registry.to_payload()
+                if hasattr(self, "operation_registry")
+                else {},
             },
         )
         self.store.record_state_snapshot(

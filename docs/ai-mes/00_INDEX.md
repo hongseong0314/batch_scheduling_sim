@@ -1,7 +1,7 @@
 # AI MES Canonical Documentation
 
 Status: canonical working specification
-Last updated: 2026-05-15
+Last updated: 2026-05-23
 Scope: simulator-backed semiconductor AI MES, AI decision architecture, MES
 runtime, APIs, and UI control room.
 
@@ -22,7 +22,8 @@ should start here.
 | 7 | [07_IMPLEMENTATION_ROADMAP.md](07_IMPLEMENTATION_ROADMAP.md) | Build phases, acceptance criteria, tests, and migration strategy |
 | 8 | [08_PRODUCT_UI_FOUNDATION_V1.md](08_PRODUCT_UI_FOUNDATION_V1.md) | Product UI foundation goals, open-design usage, and frontend acceptance criteria |
 | 9 | [09_PROCESS_APC_MCP_AGENT.md](09_PROCESS_APC_MCP_AGENT.md) | Process A APC tool-calling agent, MCP server, and read-only process model API |
-| 10 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 10 | [10_OPERATION_REGISTRY_ACTION_PROPOSAL.md](10_OPERATION_REGISTRY_ACTION_PROPOSAL.md) | Production-transition operation registry and legacy-safe action proposal contract |
+| 11 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -68,6 +69,12 @@ and maintenance context to the candidates and final command.
   generator, evaluator, and DTO artifacts live under `src/mes/harnessing/`.
 - Treat `src/mes/rule_engine.py` as the execution gate. AI recommendations do
   not directly mutate simulator or MES state.
+- Treat `src/mes/operations/registry.py` as the operation/equipment metadata
+  boundary. A/B/C are default registry entries, not the final production process
+  model.
+- Treat `src/mes/action_proposals.py` as the production-facing command boundary.
+  AI commands become legacy-safe Action Proposals; they do not directly control
+  production equipment.
 - Treat `src/mes/api.py` as route wiring only. Runtime state, simulation
   control, traceability, equipment detail, and Gantt payload builders live under
   `src/mes/runtime/`.
@@ -118,6 +125,12 @@ Implemented today:
   `C_0`) remain state/action keys, while `stage_display_names` and
   `equipment_display_names` provide configurable process/tool names for UI and
   API display payloads.
+- Operation registry: A/B/C and their equipment are exposed through
+  `GET /api/v2/operations`, with operation/equipment definitions designed so
+  real process steps can later be inserted from route/equipment master data.
+- Action proposal boundary: validated MES commands are exposed as
+  `LEGACY_MES_ACTION_PROPOSAL` records through `GET /api/v2/action-proposals`.
+  These proposals explicitly set `direct_equipment_control=false`.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

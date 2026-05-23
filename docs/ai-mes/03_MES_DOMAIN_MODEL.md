@@ -1,7 +1,7 @@
 # MES Domain Model
 
 Status: canonical  
-Last updated: 2026-05-10
+Last updated: 2026-05-23
 
 ## Purpose
 
@@ -119,6 +119,41 @@ Status mapping:
 Health state includes A `u/m_age`, B `v/b_age`, C `finish_time`, and other
 machine snapshot fields.
 
+### OperationDefinition
+
+OperationDefinition is the production-transition description of a process step.
+It lives in `src/mes/operations/registry.py` and is exposed through
+`GET /api/v2/operations`.
+
+Current default operations are still simulator stages:
+
+| Operation id | Display name | Type | Boundary |
+|---|---|---|---|
+| `A` | Process QA | `process_qa` | `SIMULATOR_STAGE` |
+| `B` | Clean QA | `clean_qa` | `SIMULATOR_STAGE` |
+| `C` | Packing | `packing` | `SIMULATOR_STAGE` |
+
+The same contract can describe future production operations such as lithography,
+etch, deposition, metrology, or packaging steps. The key fields are
+`operation_id`, upstream/downstream ids, queue keys, equipment group,
+batch/process defaults, policy keys, and `legacy_submission_mode`.
+
+### EquipmentDefinition
+
+EquipmentDefinition is the registry metadata for a capable tool. It is separate
+from live Equipment state. The registry says what a tool is capable of; the
+runtime Equipment DTO says what it is doing now.
+
+Important fields:
+
+- `equipment_id`
+- `display_name`
+- `equipment_group_id`
+- `capable_operations`
+- `batch_size`
+- `execution_boundary`
+- `metadata`
+
 ### Recipe
 
 Recipe is the process-control master and runtime selection record.
@@ -217,6 +252,46 @@ Current fields:
 - `reasons`
 
 The command may contain a simulator action payload after validation.
+
+### ActionProposal
+
+ActionProposal is the production-facing projection of a validated MESCommand.
+It lives in `src/mes/action_proposals.py`.
+
+In the simulator path, a command can still be executed against `env.step()`. In
+the production path, the AI layer must treat that same intent as a proposal to a
+legacy MES boundary.
+
+Current fields:
+
+- `proposal_id`
+- `proposal_type`
+- `correlation_id`
+- `operation_id`
+- `source_command_id`
+- `source_command_type`
+- `validation_status`
+- `status`
+- `candidate_id`
+- `target_equipment_id`
+- `target_equipment_group_id`
+- `target_unit_ids`
+- `target_lot_ids`
+- `policy_refs`
+- `legacy_submission_mode`
+- `direct_equipment_control`
+- `payload`
+- `run_id`
+
+The invariant is:
+
+```python
+direct_equipment_control = False
+```
+
+Future production adapters may submit the proposal to a legacy outbox,
+approval queue, or integration API, but the AI MES should not bypass the
+legacy execution authority.
 
 ### Genealogy
 

@@ -45,7 +45,8 @@ from src.mes.runtime.genealogy import (
     task_genealogy as build_task_genealogy,
 )
 from src.mes.runtime.live_state import fab_kpis, live_fab_state, mes_state
-from src.mes.runtime.run_ledger import ledger_index_payload, runs_payload
+from src.mes.runtime.production_boundary_api import build_production_boundary_router
+from src.mes.runtime.run_ledger_api import build_run_ledger_router
 from src.mes.runtime.simulation_control import (
     generate_tasks as generate_runtime_tasks,
     ready_stages,
@@ -59,7 +60,10 @@ from src.mes.ui.assets import control_room_html
 
 context = MESAPIContext()
 app = FastAPI(title="Manufacturing AI MES MVP API", version="0.2.0")
+app.state.context = context
 configure_process_chat_context(context)
+app.include_router(build_production_boundary_router(context))
+app.include_router(build_run_ledger_router(context))
 app.include_router(process_chat_router)
 app.include_router(process_tools_router)
 
@@ -335,23 +339,6 @@ def assignment_trace(
         candidate_id=candidate_id,
         run_id=run_id,
     )
-
-
-@app.get("/api/v2/runs")
-def runs() -> Dict[str, Any]:
-    return runs_payload(context)
-
-
-@app.get("/api/v2/ledger-index/{index_name}")
-def ledger_index(
-    index_name: str,
-    run_id: Optional[str] = Query(None),
-    limit: int = Query(200, ge=1, le=1000),
-) -> Dict[str, Any]:
-    try:
-        return ledger_index_payload(context, index_name, run_id=run_id, limit=limit)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/v2/genealogy/task/{task_uid}")

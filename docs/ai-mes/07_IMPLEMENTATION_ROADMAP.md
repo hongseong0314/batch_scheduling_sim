@@ -98,6 +98,8 @@ Deliverables:
 - planner/generator/evaluator moved to `src/mes/harnessing/`,
 - `src/mes/services.py` reduced to a facade over `src/mes/decision/`,
 - `src/mes/api.py` reduced to FastAPI route wiring,
+- feature-specific FastAPI route declarations split into focused
+  `src/mes/runtime/*_api.py` router modules,
 - runtime payload builders moved to `src/mes/runtime/`,
 - control-room UI moved to `src/mes/ui/templates` and `src/mes/ui/static`,
 - evaluator checks for portfolio and layer consistency,

@@ -76,8 +76,8 @@ and maintenance context to the candidates and final command.
   AI commands become legacy-safe Action Proposals; they do not directly control
   production equipment.
 - Treat `src/mes/api.py` as route wiring only. Runtime state, simulation
-  control, traceability, equipment detail, and Gantt payload builders live under
-  `src/mes/runtime/`.
+  control, traceability, equipment detail, Gantt payload builders, and
+  feature-specific FastAPI routers live under `src/mes/runtime/`.
 - Treat `src/mes/ui/templates/control_room.html` and `src/mes/ui/static/*` as
   the control-room implementation. `src/mes/live_ui.py` is a compatibility
   import only.

@@ -13,7 +13,6 @@ from typing import Any, Dict, List, Optional
 
 from src.mes.adapters import wafer_id_from_task_uid
 from src.mes.domain import MESCommand
-from src.mes.recommendations import make_id
 
 
 @dataclass

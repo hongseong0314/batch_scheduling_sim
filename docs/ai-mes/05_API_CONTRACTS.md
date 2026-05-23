@@ -8,17 +8,21 @@ Last updated: 2026-05-23
 This document defines the simulator-backed MES API surface and the target API
 contracts needed for the layered AI architecture.
 
-The current route implementation lives in `src/mes/api.py`. Route functions are
-thin and delegate runtime behavior to `src/mes/runtime/*`.
+The FastAPI app wiring lives in `src/mes/api.py`. Feature-specific route
+declarations live in small router modules under `src/mes/runtime/*_api.py` and
+delegate runtime behavior to `src/mes/runtime/*`.
 
 | Runtime concern | Module |
 |---|---|
+| app shell and health | `src/mes/runtime/app_shell_api.py` |
+| v1 compatibility routes | `src/mes/runtime/v1_api.py` |
+| v2 simulator control and live state routes | `src/mes/runtime/control_api.py` |
 | lifecycle/reset | `src/mes/runtime/context.py` |
 | run-cycle/run-until/autoplay/generate lot | `src/mes/runtime/simulation_control.py` |
 | live control-room state | `src/mes/runtime/live_state.py` |
-| decision-chain traceability | `src/mes/runtime/decision_trace.py` |
+| decision-chain and portfolio traceability routes | `src/mes/runtime/trace_api.py`, `src/mes/runtime/decision_trace.py`, `src/mes/runtime/candidate_portfolio.py` |
 | assignment and genealogy traceability | `src/mes/runtime/assignment_trace.py`, `src/mes/runtime/genealogy.py` |
-| AI developer console payloads | `src/mes/runtime/ai_dev.py` |
+| AI developer console routes | `src/mes/runtime/ai_dev_api.py`, `src/mes/runtime/ai_dev.py`, `src/mes/runtime/experiments.py` |
 | operation registry and action proposal routes | `src/mes/runtime/production_boundary_api.py`, `src/mes/runtime/operations.py`, `src/mes/operations/registry.py` |
 | run and ledger index routes | `src/mes/runtime/run_ledger_api.py`, `src/mes/runtime/run_ledger.py` |
 | equipment detail | `src/mes/runtime/equipment_detail.py` |

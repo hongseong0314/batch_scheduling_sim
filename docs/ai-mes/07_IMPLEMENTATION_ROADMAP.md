@@ -227,6 +227,9 @@ Deliverables:
 - reset that preserves prior genealogy under prior run ids,
 - normalized SQLite index tables for runs, tasks, lots, assignments,
   equipment timeline, commands, events, state snapshots, and genealogy edges,
+- SQLite persistence internals split into `src/mes/persistence/sqlite_schema.py`,
+  `sqlite_records.py`, and `sqlite_ledger_index.py` while preserving the
+  `SQLiteMESStore` public API,
 - direct `/api/v2/ledger-index/{index_name}` developer index query API,
 - SQLite-backed Agent Run records for `/mes#chat` and Agent Run Inspector,
 - configurable process/equipment display names while preserving canonical

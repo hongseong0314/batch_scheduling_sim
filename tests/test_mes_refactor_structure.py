@@ -76,3 +76,22 @@ def test_harness_and_service_facades_delegate_to_feature_modules() -> None:
     assert "def simulator_actions_from_validation" not in service_source
     assert len(harness_source.splitlines()) < 160
     assert len(service_source.splitlines()) < 120
+
+
+def test_sqlite_store_delegates_to_persistence_modules() -> None:
+    expected_modules = [
+        MES_ROOT / "persistence" / "sqlite_schema.py",
+        MES_ROOT / "persistence" / "sqlite_records.py",
+        MES_ROOT / "persistence" / "sqlite_ledger_index.py",
+    ]
+    for path in expected_modules:
+        assert path.exists()
+
+    source = (MES_ROOT / "sqlite_store.py").read_text()
+    assert "class SQLiteSchemaMixin" not in source
+    assert "class SQLiteRecordMixin" not in source
+    assert "class SQLiteLedgerIndexMixin" not in source
+    assert "CREATE TABLE IF NOT EXISTS task_index" not in source
+    assert "def _index_command" not in source
+    assert "def _rows" not in source
+    assert len(source.splitlines()) < 260

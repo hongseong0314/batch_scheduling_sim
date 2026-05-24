@@ -108,7 +108,9 @@ Implemented today:
   `simulator_actions.py`.
 - Store: in-memory plus SQLite JSON payload persistence and run-scoped
   normalized ledger indexes for audit records, runtime entities, genealogy,
-  assignments, commands, events, and state snapshots.
+  assignments, commands, events, and state snapshots. `SQLiteMESStore` keeps
+  the public API; `src/mes/persistence/*` owns schema, record, and ledger-index
+  internals.
 - API/UI: live simulator-backed MES endpoints and a dense `/mes` control room
   with Candidate Portfolio, Assignment Trace, AI Developer Console, Policy
   Experiment Runner, Product UI Foundation, and Digital Twin Genealogy V1.

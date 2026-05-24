@@ -1,0 +1,235 @@
+# -*- coding: utf-8 -*-
+"""SQLite schema helpers for MES persistence."""
+
+from __future__ import annotations
+
+
+SCHEMA_VERSION = "run_index_v1"
+TABLES = {
+    "lots": "lot_id",
+    "wafers": "wafer_id",
+    "equipment": "equipment_id",
+    "recipes": "recipe_id",
+    "feature_snapshots": "feature_snapshot_id",
+    "recommendations": "recommendation_id",
+    "commands": "command_id",
+    "validations": "",
+    "events": "",
+}
+INDEX_TABLES = (
+    "run_index",
+    "task_index",
+    "lot_index",
+    "assignment_index",
+    "equipment_timeline_index",
+    "command_ledger_index",
+    "event_ledger_index",
+    "state_snapshot_index",
+    "genealogy_edge_index",
+)
+
+
+class SQLiteSchemaMixin:
+    """Schema constants and DDL for SQLite-backed stores."""
+
+    SCHEMA_VERSION = SCHEMA_VERSION
+    TABLES = TABLES
+    INDEX_TABLES = INDEX_TABLES
+
+    def _init_schema(self) -> None:
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+        for table in self.TABLES:
+            self._conn.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    record_id TEXT,
+                    correlation_id TEXT,
+                    payload TEXT NOT NULL
+                )
+                """
+            )
+            self._conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{table}_corr ON {table}(correlation_id)"
+            )
+            self._conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{table}_record ON {table}(record_id)"
+            )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS run_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT UNIQUE NOT NULL,
+                start_time INTEGER,
+                reason TEXT,
+                status TEXT,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS task_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                task_uid INTEGER NOT NULL,
+                wafer_id TEXT,
+                lot_id TEXT,
+                latest_location TEXT,
+                time INTEGER,
+                payload TEXT NOT NULL,
+                UNIQUE(run_id, task_uid)
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lot_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                lot_id TEXT NOT NULL,
+                task_count INTEGER,
+                payload TEXT NOT NULL,
+                UNIQUE(run_id, lot_id)
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS assignment_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                command_id TEXT NOT NULL,
+                correlation_id TEXT,
+                candidate_id TEXT,
+                stage TEXT,
+                equipment_id TEXT,
+                task_uid INTEGER,
+                task_uids TEXT,
+                start_time INTEGER,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS equipment_timeline_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                equipment_id TEXT,
+                time INTEGER,
+                event_type TEXT,
+                command_id TEXT,
+                correlation_id TEXT,
+                task_uids TEXT,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS command_ledger_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                command_id TEXT UNIQUE NOT NULL,
+                correlation_id TEXT,
+                status TEXT,
+                validation_status TEXT,
+                equipment_id TEXT,
+                stage TEXT,
+                task_uids TEXT,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS event_ledger_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                event_id TEXT UNIQUE NOT NULL,
+                correlation_id TEXT,
+                event_type TEXT,
+                actor_type TEXT,
+                equipment_id TEXT,
+                operation_id TEXT,
+                time INTEGER,
+                task_uids TEXT,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS state_snapshot_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                snapshot_id TEXT UNIQUE NOT NULL,
+                source TEXT,
+                correlation_id TEXT,
+                layer_id TEXT,
+                time INTEGER,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS genealogy_edge_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                parent_type TEXT,
+                parent_id TEXT,
+                child_type TEXT,
+                child_id TEXT,
+                operation_id TEXT,
+                equipment_id TEXT,
+                event_id TEXT,
+                correlation_id TEXT,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        for table in self.INDEX_TABLES:
+            self._conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{table}_run ON {table}(run_id)"
+            )
+        self._conn.commit()
+
+    def _table_exists(self, table: str) -> bool:
+        with self._db_lock:
+            row = self._conn.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'table' AND name = ?
+                """,
+                (table,),
+            ).fetchone()
+        return row is not None
+
+    def _schema_version(self) -> str:
+        with self._db_lock:
+            row = self._conn.execute(
+                "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+            ).fetchone()
+        return str(row["value"]) if row else ""
+
+    def _set_schema_version(self, version: str) -> None:
+        with self._db_lock:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO schema_meta(key, value)
+                VALUES ('schema_version', ?)
+                """,
+                (version,),
+            )
+            self._conn.commit()
+

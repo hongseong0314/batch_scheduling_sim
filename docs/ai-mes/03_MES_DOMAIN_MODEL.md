@@ -320,6 +320,16 @@ Product -> Lot -> Wafer -> Operation -> Equipment -> Recipe -> QA result
 
 `SQLiteMESStore` persists these records as JSON payloads in local SQLite tables
 and maintains a run-scoped normalized index for developer genealogy queries.
+The public store class remains `src/mes/sqlite_store.py`; focused persistence
+helpers live under `src/mes/persistence/`:
+
+- `sqlite_schema.py`: schema version, JSON audit tables, and normalized ledger
+  DDL,
+- `sqlite_records.py`: JSON payload insert/upsert/reload and normalized index
+  reads,
+- `sqlite_ledger_index.py`: command, event, task, lot, equipment timeline, and
+  genealogy edge indexing.
+
 The normalized index is intentionally narrow and append-oriented:
 
 - `run_index`,
@@ -366,7 +376,7 @@ genealogy from events.
 | simulator task/machine snapshots | `ManufacturingEnv.get_decision_state()` |
 | MES DTO conversion | `SimulatorMESAdapter` |
 | runtime entity persistence | `InMemoryMESStore` / `SQLiteMESStore` |
-| audit persistence | store classes |
+| audit persistence | `SQLiteMESStore` plus `src/mes/persistence/*` helpers |
 | final command validation | `MESRuleEngine` |
 | API route wiring | `src/mes/api.py` |
 | runtime payloads | `src/mes/runtime/*` |

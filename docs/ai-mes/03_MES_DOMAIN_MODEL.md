@@ -1,7 +1,7 @@
 # MES Domain Model
 
 Status: canonical  
-Last updated: 2026-05-23
+Last updated: 2026-05-24
 
 ## Purpose
 
@@ -326,6 +326,52 @@ Future production adapters may submit the proposal to a legacy outbox,
 approval queue, or integration API, but the AI MES should not bypass the
 legacy execution authority.
 
+### LegacyDecision
+
+LegacyDecision records how the legacy MES responded to an ActionProposal.
+
+Current fields:
+
+- `decision_id`
+- `proposal_id`
+- `legacy_status`
+- `correlation_id`
+- `legacy_assignment_id`
+- `actual_equipment_id`
+- `actual_unit_ids`
+- `reason`
+- `decision_time`
+- `decided_by`
+- `payload`
+- `run_id`
+
+Typical `legacy_status` values are `SUBMITTED`, `ACCEPTED`, `MODIFIED`,
+`REJECTED`, and `EXPIRED`. The current implementation does not enforce the enum
+because production systems often introduce site-specific intermediate states.
+
+### OutcomeRecord
+
+OutcomeRecord records what actually happened after the legacy MES decision.
+
+Current fields:
+
+- `outcome_id`
+- `proposal_id`
+- `outcome_status`
+- `correlation_id`
+- `actual_equipment_id`
+- `actual_unit_ids`
+- `event_time`
+- `quality_result`
+- `cycle_time`
+- `rework_count`
+- `payload`
+- `run_id`
+
+Typical `outcome_status` values are `EXECUTED`, `FAILED`, `CANCELLED`,
+`QUALITY_PASS`, and `QUALITY_FAIL`. These records are the bridge from safe AI
+recommendations to policy evaluation and future learning datasets.
+
 ### Genealogy
 
 Genealogy is defined but not fully populated yet. It should connect:
@@ -350,6 +396,9 @@ Product -> Lot -> Wafer -> Operation -> Equipment -> Recipe -> QA result
 - validations,
 - commands,
 - events.
+- source-key mappings,
+- legacy decisions,
+- outcome records.
 
 `SQLiteMESStore` persists these records as JSON payloads in local SQLite tables
 and maintains a run-scoped normalized index for developer genealogy queries.
@@ -374,7 +423,8 @@ The normalized index is intentionally narrow and append-oriented:
 - `event_ledger_index`,
 - `state_snapshot_index`,
 - `genealogy_edge_index`,
-- `source_key_mapping_index`.
+- `source_key_mapping_index`,
+- `proposal_lifecycle_index`.
 
 Reset starts a new `run_id` and clears only the live simulator/runtime cache.
 Historical command, event, task, lot, equipment, and state snapshot evidence
@@ -394,6 +444,8 @@ The production-style repository should normalize at least:
 - rule validations,
 - commands,
 - events,
+- source-key mappings,
+- proposal lifecycle decisions/outcomes,
 - genealogy,
 - reservations/locks,
 - operator approvals.

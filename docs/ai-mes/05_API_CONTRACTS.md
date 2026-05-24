@@ -1,7 +1,7 @@
 # API Contracts
 
 Status: canonical  
-Last updated: 2026-05-23
+Last updated: 2026-05-24
 
 ## Purpose
 
@@ -56,6 +56,9 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/runs` | Current and historical local simulator run/session index |
 | `GET /api/v2/operations` | Operation and equipment registry for simulator and future production process mapping |
 | `GET /api/v2/action-proposals` | Legacy-safe action proposals derived from validated MES commands |
+| `GET /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Legacy MES accept/modify/reject decision records for one proposal |
+| `GET /api/v2/action-proposals/{proposal_id}/outcomes` | Execution/quality outcome records for one proposal |
+| `GET /api/v2/action-proposals/{proposal_id}/lifecycle` | Combined lifecycle summary, legacy decisions, and outcomes for one proposal |
 | `GET /api/v2/source-key-mappings` | Legacy source-system key to canonical AI MES id mappings |
 | `GET /api/v2/source-key-mappings/resolve` | Resolve one source-system key to a canonical AI MES id |
 | `GET /api/v2/ledger-index/{index_name}` | Run-scoped normalized SQLite index rows |
@@ -86,6 +89,8 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/simulation/autoplay/status` | Poll autoplay and optionally step |
 | `POST /api/v2/process-tools/{tool_id}/run` | Read-only process model inference with structured input |
 | `POST /api/v2/process-chat` | Process-engineer chat over read-only process tools with LLM/fallback mode |
+| `POST /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Record the legacy MES decision for an AI proposal |
+| `POST /api/v2/action-proposals/{proposal_id}/outcomes` | Record actual execution/quality evidence for an AI proposal |
 | `POST /api/v2/source-key-mappings` | Upsert one legacy source-key mapping |
 
 ## Current V2 Payload Summary
@@ -364,9 +369,56 @@ AI layer is proposing an action to legacy MES, not directly driving equipment.
             },
             "legacy_submission_mode": "SIMULATOR_ONLY",
             "direct_equipment_control": False,
+            "lifecycle": {
+                "legacy_decision_count": 0,
+                "outcome_count": 0,
+                "latest_legacy_status": "",
+                "latest_outcome_status": ""
+            },
             "payload": {"stage": "A", "task_uids": [1, 2, 3]}
         }
     ]
+}
+```
+
+Action Proposal lifecycle endpoints record the legacy MES feedback loop without
+mutating the simulator command path.
+
+```python
+POST /api/v2/action-proposals/PROP_CMD_123/legacy-decisions
+{
+    "legacy_status": "ACCEPTED",
+    "correlation_id": "CORR_...",
+    "legacy_assignment_id": "LEGACY_ASSIGN_...",
+    "actual_equipment_id": "A_0",
+    "actual_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+    "reason": "legacy mes accepted recommendation",
+    "decision_time": 120
+}
+
+POST /api/v2/action-proposals/PROP_CMD_123/outcomes
+{
+    "outcome_status": "EXECUTED",
+    "correlation_id": "CORR_...",
+    "actual_equipment_id": "A_0",
+    "actual_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+    "event_time": 140,
+    "quality_result": {"status": "PASS"},
+    "cycle_time": 20.0,
+    "rework_count": 0
+}
+
+GET /api/v2/action-proposals/PROP_CMD_123/lifecycle
+{
+    "proposal_id": "PROP_CMD_123",
+    "summary": {
+        "legacy_decision_count": 1,
+        "outcome_count": 1,
+        "latest_legacy_status": "ACCEPTED",
+        "latest_outcome_status": "EXECUTED"
+    },
+    "legacy_decisions": [{"decision_id": "LDEC_..."}],
+    "outcomes": [{"outcome_id": "OUT_..."}]
 }
 ```
 

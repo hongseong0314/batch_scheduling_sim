@@ -1,7 +1,7 @@
 # Implementation Roadmap
 
 Status: canonical  
-Last updated: 2026-05-23
+Last updated: 2026-05-24
 
 ## Guiding Principle
 
@@ -268,7 +268,13 @@ Deliverables:
 - `GET /api/v2/operations` registry API,
 - Action Proposal DTOs in `src/mes/action_proposals.py`,
 - `GET /api/v2/action-proposals` API derived from validated commands,
-- explicit `direct_equipment_control=false` production boundary.
+- explicit `direct_equipment_control=false` production boundary,
+- proposal lifecycle DTOs for legacy decisions and execution outcomes,
+- in-memory and SQLite persistence for proposal lifecycle records,
+- `proposal_lifecycle_index` normalized ledger table,
+- `POST/GET /api/v2/action-proposals/{proposal_id}/legacy-decisions`,
+- `POST/GET /api/v2/action-proposals/{proposal_id}/outcomes`,
+- `GET /api/v2/action-proposals/{proposal_id}/lifecycle`.
 
 Acceptance:
 
@@ -276,14 +282,14 @@ Acceptance:
 - real operations can be represented without changing environment physics,
 - AI-generated commands can be projected as legacy-safe proposals,
 - proposal records link back to correlation id, candidate id, command id, target
-  equipment, target units, and L1/L2 recommendation ids.
+  equipment, target units, and L1/L2 recommendation ids,
+- legacy accept/modify/reject decisions and execution outcomes can be linked
+  back to the `proposal_id`,
+- `/api/v2/action-proposals` includes lifecycle summary fields for each proposal.
 
 Future deliverables:
 
 - source key mapping from legacy MES/RMS/FDC/APC/ERP ids,
-- proposal lifecycle persistence: submitted, accepted, modified, rejected,
-  expired, executed,
-- actual legacy assignment/outcome records linked by `proposal_id`,
 - production outbox adapter and operator approval queue,
 - operation registry loading from route/equipment master data.
 
@@ -320,22 +326,20 @@ Future deliverables:
 
 Recommended next build order:
 
-1. Proposal lifecycle records that capture legacy MES accept/modify/reject and
-   actual execution outcome for each Action Proposal.
-2. Legacy-safe ingestion contracts for operation, equipment, lot, unit, recipe,
+1. Legacy-safe ingestion contracts for operation, equipment, lot, unit, recipe,
    assignment, event, and quality records using SourceKeyMapping.
-3. Event-sourced WIP reconstruction independent of live simulator state.
-4. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
+2. Event-sourced WIP reconstruction independent of live simulator state.
+3. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
    packing quality.
-5. Add approval-gated write-tool contract for future L4/operator workflows,
+4. Add approval-gated write-tool contract for future L4/operator workflows,
    keeping current `/mes#chat` default read-only.
-6. Scenario preset library and config controls for balanced/A-bottleneck/
+5. Scenario preset library and config controls for balanced/A-bottleneck/
    B-bottleneck/stress experiments.
-7. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
-8. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
-9. Richer FeatureSnapshot and state diff indexing for every decision cycle.
-10. Quality/rework lineage records linked to task, recipe/APC, and equipment.
-11. Recipe/APC command endpoints and operator hold/release/approval workflows.
+6. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
+7. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
+8. Richer FeatureSnapshot and state diff indexing for every decision cycle.
+9. Quality/rework lineage records linked to task, recipe/APC, and equipment.
+10. Recipe/APC command endpoints and operator hold/release/approval workflows.
 
 ## Phase 9: Operator Workflow And Production Boundaries
 

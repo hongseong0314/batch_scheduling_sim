@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 
-SCHEMA_VERSION = "source_key_mapping_v1"
+SCHEMA_VERSION = "proposal_lifecycle_v1"
 TABLES = {
     "lots": "lot_id",
     "wafers": "wafer_id",
     "equipment": "equipment_id",
     "recipes": "recipe_id",
     "source_key_mappings": "mapping_id",
+    "legacy_decisions": "decision_id",
+    "outcome_records": "outcome_id",
     "feature_snapshots": "feature_snapshot_id",
     "recommendations": "recommendation_id",
     "commands": "command_id",
@@ -28,6 +30,7 @@ INDEX_TABLES = (
     "state_snapshot_index",
     "genealogy_edge_index",
     "source_key_mapping_index",
+    "proposal_lifecycle_index",
 )
 
 
@@ -218,6 +221,22 @@ class SQLiteSchemaMixin:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS proposal_lifecycle_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT,
+                proposal_id TEXT NOT NULL,
+                record_type TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                correlation_id TEXT,
+                status TEXT,
+                event_time INTEGER,
+                payload TEXT NOT NULL,
+                UNIQUE(record_type, record_id)
+            )
+            """
+        )
         for table in self.INDEX_TABLES:
             self._conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{table}_run ON {table}(run_id)"
@@ -226,6 +245,12 @@ class SQLiteSchemaMixin:
             """
             CREATE INDEX IF NOT EXISTS idx_source_key_mapping_lookup
             ON source_key_mapping_index(source_system, source_table, source_pk, entity_type)
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_proposal
+            ON proposal_lifecycle_index(proposal_id, record_type)
             """
         )
         self._conn.commit()

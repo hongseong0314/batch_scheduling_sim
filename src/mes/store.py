@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from src.mes.action_proposals import LegacyDecision, OutcomeRecord
 from src.mes.adapters import wafer_id_from_task_uid
 from src.mes.domain import (
     AIRecommendation,
@@ -50,6 +51,7 @@ class InMemoryMESStore:
         "state_snapshot_index",
         "genealogy_edge_index",
         "source_key_mapping_index",
+        "proposal_lifecycle_index",
     )
 
     def __init__(self):
@@ -60,6 +62,8 @@ class InMemoryMESStore:
         self._equipment: Dict[str, Equipment] = {}
         self._recipes: Dict[str, Recipe] = {}
         self._source_key_mappings: Dict[str, SourceKeyMapping] = {}
+        self._legacy_decisions: Dict[str, LegacyDecision] = {}
+        self._outcome_records: Dict[str, OutcomeRecord] = {}
         self._feature_snapshots: Dict[str, FeatureSnapshot] = {}
         self._recommendations: Dict[str, AIRecommendation] = {}
         self._validations: List[RuleValidationResult] = []
@@ -120,6 +124,10 @@ class InMemoryMESStore:
             "state_snapshot_index": len(self.feature_snapshots(run_id=run_id)),
             "genealogy_edge_index": 0,
             "source_key_mapping_index": len(self.source_key_mappings(run_id=run_id)),
+            "proposal_lifecycle_index": (
+                len(self.legacy_decisions(run_id=run_id))
+                + len(self.outcome_records(run_id=run_id))
+            ),
         }
 
     def normalized_index_rows(
@@ -167,6 +175,37 @@ class InMemoryMESStore:
             ]
         if name == "source_key_mapping_index":
             return [mapping.to_dict() for mapping in self.source_key_mappings(run_id=run_id)[-limit:]]
+        if name == "proposal_lifecycle_index":
+            rows = []
+            for decision in self.legacy_decisions(run_id=run_id):
+                payload = decision.to_dict()
+                rows.append(
+                    {
+                        "run_id": decision.run_id,
+                        "proposal_id": decision.proposal_id,
+                        "record_type": "LEGACY_DECISION",
+                        "record_id": decision.decision_id,
+                        "correlation_id": decision.correlation_id,
+                        "status": decision.legacy_status,
+                        "event_time": decision.decision_time,
+                        "payload": payload,
+                    }
+                )
+            for outcome in self.outcome_records(run_id=run_id):
+                payload = outcome.to_dict()
+                rows.append(
+                    {
+                        "run_id": outcome.run_id,
+                        "proposal_id": outcome.proposal_id,
+                        "record_type": "OUTCOME",
+                        "record_id": outcome.outcome_id,
+                        "correlation_id": outcome.correlation_id,
+                        "status": outcome.outcome_status,
+                        "event_time": outcome.event_time,
+                        "payload": payload,
+                    }
+                )
+            return rows[-limit:]
         return []
 
     def record_harness_result(
@@ -238,6 +277,18 @@ class InMemoryMESStore:
         self._ensure_run_id(mapping)
         self._source_key_mappings[mapping.mapping_id] = mapping
 
+    def add_legacy_decision(self, decision: LegacyDecision) -> None:
+        self._ensure_run_id(decision)
+        if not decision.decision_id:
+            decision.decision_id = make_id("LDEC")
+        self._legacy_decisions[decision.decision_id] = decision
+
+    def add_outcome_record(self, outcome: OutcomeRecord) -> None:
+        self._ensure_run_id(outcome)
+        if not outcome.outcome_id:
+            outcome.outcome_id = make_id("OUT")
+        self._outcome_records[outcome.outcome_id] = outcome
+
     def source_key_mappings(
         self,
         source_system: Optional[str] = None,
@@ -284,6 +335,46 @@ class InMemoryMESStore:
             matches = [mapping for mapping in matches if mapping.run_id == run_id]
         return matches[-1] if matches else None
 
+    def legacy_decisions(
+        self,
+        proposal_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[LegacyDecision]:
+        decisions = list(self._legacy_decisions.values())
+        if proposal_id is not None:
+            decisions = [
+                decision for decision in decisions if decision.proposal_id == proposal_id
+            ]
+        if correlation_id is not None:
+            decisions = [
+                decision
+                for decision in decisions
+                if decision.correlation_id == correlation_id
+            ]
+        if run_id is not None:
+            decisions = [decision for decision in decisions if decision.run_id == run_id]
+        return decisions
+
+    def outcome_records(
+        self,
+        proposal_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[OutcomeRecord]:
+        outcomes = list(self._outcome_records.values())
+        if proposal_id is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.proposal_id == proposal_id]
+        if correlation_id is not None:
+            outcomes = [
+                outcome
+                for outcome in outcomes
+                if outcome.correlation_id == correlation_id
+            ]
+        if run_id is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.run_id == run_id]
+        return outcomes
+
     def sync_runtime_state(
         self,
         mes_state: Dict[str, Any],
@@ -315,6 +406,8 @@ class InMemoryMESStore:
         self._commands.clear()
         self._events.clear()
         self._source_key_mappings.clear()
+        self._legacy_decisions.clear()
+        self._outcome_records.clear()
 
     def lots(self) -> List[Lot]:
         return list(self._lots.values())

@@ -164,6 +164,8 @@ class SQLiteMESStore(
                 "validations",
                 "events",
                 "source_key_mappings",
+                "legacy_decisions",
+                "outcome_records",
             ):
                 self._conn.execute(f"DELETE FROM {table}")
             for table in self.INDEX_TABLES:

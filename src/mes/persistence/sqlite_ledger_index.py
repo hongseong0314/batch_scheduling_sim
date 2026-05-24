@@ -150,6 +150,39 @@ class SQLiteLedgerIndexMixin:
                 )
             self._conn.commit()
 
+    def _index_proposal_lifecycle(
+        self,
+        run_id: str,
+        proposal_id: str,
+        record_type: str,
+        record_id: str,
+        correlation_id: str,
+        status: str,
+        event_time: Any,
+        payload: Dict[str, Any],
+    ) -> None:
+        with self._db_lock:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO proposal_lifecycle_index(
+                    run_id, proposal_id, record_type, record_id, correlation_id,
+                    status, event_time, payload
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    proposal_id,
+                    record_type,
+                    record_id,
+                    correlation_id,
+                    status,
+                    int(event_time) if event_time is not None else None,
+                    self._json(payload),
+                ),
+            )
+            self._conn.commit()
+
     def _index_tasks_and_lots(self, run_id: str, decision_state: Dict[str, Any]) -> None:
         tasks = decision_state.get("tasks", {}) or {}
         lot_counts: Dict[str, int] = {}
@@ -266,4 +299,3 @@ class SQLiteLedgerIndexMixin:
             if suffix.isdigit():
                 candidates.append(int(suffix))
         return sorted({int(uid) for uid in candidates if str(uid).isdigit()})
-

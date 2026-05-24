@@ -1,7 +1,7 @@
 # Operation Registry And Action Proposal
 
 Status: canonical production-transition specification  
-Last updated: 2026-05-23
+Last updated: 2026-05-24
 
 ## Purpose
 
@@ -143,6 +143,12 @@ validated command.
     },
     "legacy_submission_mode": "SIMULATOR_ONLY",
     "direct_equipment_control": false,
+    "lifecycle": {
+        "legacy_decision_count": 0,
+        "outcome_count": 0,
+        "latest_legacy_status": "",
+        "latest_outcome_status": ""
+    },
     "payload": {"stage": "A", "task_uids": [1, 2, 3]},
     "run_id": "RUN_..."
 }
@@ -157,6 +163,67 @@ The critical production field is:
 This field must remain false for the current architecture. A future write
 adapter may submit proposals to a legacy outbox, operator review queue, or
 integration API, but it must not bypass the production authority boundary.
+
+## Action Proposal Lifecycle V1
+
+Action Proposal Lifecycle records capture what the legacy execution authority
+did with an AI proposal and what happened afterward. This is the minimum
+production feedback loop needed before connecting real MES/FDC/QA data.
+
+Current implementation:
+
+- module: `src/mes/action_proposals.py`
+- store: `InMemoryMESStore` and `SQLiteMESStore`
+- normalized index: `proposal_lifecycle_index`
+- APIs:
+  - `POST /api/v2/action-proposals/{proposal_id}/legacy-decisions`
+  - `GET /api/v2/action-proposals/{proposal_id}/legacy-decisions`
+  - `POST /api/v2/action-proposals/{proposal_id}/outcomes`
+  - `GET /api/v2/action-proposals/{proposal_id}/outcomes`
+  - `GET /api/v2/action-proposals/{proposal_id}/lifecycle`
+
+`LegacyDecision` records the legacy MES decision:
+
+```python
+{
+    "decision_id": "LDEC_...",
+    "proposal_id": "PROP_CMD_123",
+    "legacy_status": "ACCEPTED",
+    "correlation_id": "CORR_...",
+    "legacy_assignment_id": "LEGACY_ASSIGN_...",
+    "actual_equipment_id": "A_0",
+    "actual_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+    "reason": "legacy mes accepted recommendation",
+    "decision_time": 120,
+    "decided_by": "LEGACY_MES",
+    "payload": {},
+    "run_id": "RUN_..."
+}
+```
+
+`OutcomeRecord` records execution and quality evidence:
+
+```python
+{
+    "outcome_id": "OUT_...",
+    "proposal_id": "PROP_CMD_123",
+    "outcome_status": "EXECUTED",
+    "correlation_id": "CORR_...",
+    "actual_equipment_id": "A_0",
+    "actual_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+    "event_time": 140,
+    "quality_result": {"status": "PASS"},
+    "cycle_time": 20.0,
+    "rework_count": 0,
+    "payload": {},
+    "run_id": "RUN_..."
+}
+```
+
+Lifecycle records are appendable audit evidence. They do not mutate simulator
+physics, and they do not imply direct AI control. They let the AI MES compare
+what it recommended against what legacy MES actually accepted, modified,
+rejected, or executed.
 
 ## Legacy Execution Loop Target
 
@@ -183,12 +250,8 @@ counterfactual KPI impact. The safety boundary is not “no action”; it is
 
 The next production-facing contracts should add:
 
-- source key mapping between legacy MES ids and canonical AI MES ids,
-- event-time, ingest-time, and decision-time separation,
-- explicit proposal lifecycle states: proposed, submitted, accepted, modified,
-  rejected, expired, executed,
-- legacy decision records linked to `proposal_id`,
-- outcome records linked to real equipment/FDC/QA evidence,
+- ingestion contracts for legacy MES/RMS/FDC/APC/ERP source records,
+- production PostgreSQL DDL and migration scripts,
+- production outbox adapter and operator approval queue,
 - reservation locks and operator approval states,
 - production operation insertion from route/equipment master data.
-

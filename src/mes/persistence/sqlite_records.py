@@ -7,6 +7,7 @@ import json
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional
 
+from src.mes.action_proposals import LegacyDecision, OutcomeRecord
 from src.mes.domain import (
     AIRecommendation,
     Equipment,
@@ -23,6 +24,46 @@ from src.mes.domain import (
 
 class SQLiteRecordMixin:
     """JSON record persistence and cache loading helpers."""
+
+    def add_legacy_decision(self, decision: LegacyDecision) -> None:
+        super().add_legacy_decision(decision)
+        payload = decision.to_dict()
+        self._upsert(
+            "legacy_decisions",
+            decision.decision_id,
+            decision.correlation_id,
+            payload,
+        )
+        self._index_proposal_lifecycle(
+            run_id=decision.run_id,
+            proposal_id=decision.proposal_id,
+            record_type="LEGACY_DECISION",
+            record_id=decision.decision_id,
+            correlation_id=decision.correlation_id,
+            status=decision.legacy_status,
+            event_time=decision.decision_time,
+            payload=payload,
+        )
+
+    def add_outcome_record(self, outcome: OutcomeRecord) -> None:
+        super().add_outcome_record(outcome)
+        payload = outcome.to_dict()
+        self._upsert(
+            "outcome_records",
+            outcome.outcome_id,
+            outcome.correlation_id,
+            payload,
+        )
+        self._index_proposal_lifecycle(
+            run_id=outcome.run_id,
+            proposal_id=outcome.proposal_id,
+            record_type="OUTCOME",
+            record_id=outcome.outcome_id,
+            correlation_id=outcome.correlation_id,
+            status=outcome.outcome_status,
+            event_time=outcome.event_time,
+            payload=payload,
+        )
 
     def upsert_source_key_mapping(self, mapping: SourceKeyMapping) -> None:
         super().upsert_source_key_mapping(mapping)
@@ -124,6 +165,12 @@ class SQLiteRecordMixin:
             payload.pop("source_key", None)
             mapping = SourceKeyMapping(**payload)
             self._source_key_mappings[mapping.mapping_id] = mapping
+        for payload in self._rows("legacy_decisions", limit=self.cache_limit):
+            decision = LegacyDecision(**payload)
+            self._legacy_decisions[decision.decision_id] = decision
+        for payload in self._rows("outcome_records", limit=self.cache_limit):
+            outcome = OutcomeRecord(**payload)
+            self._outcome_records[outcome.outcome_id] = outcome
         for payload in self._rows("feature_snapshots", limit=self.cache_limit):
             snapshot = FeatureSnapshot(**payload)
             self._feature_snapshots[snapshot.feature_snapshot_id] = snapshot

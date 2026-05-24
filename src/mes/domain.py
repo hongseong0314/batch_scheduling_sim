@@ -104,6 +104,34 @@ class Recipe:
 
 
 @dataclass
+class SourceKeyMapping:
+    mapping_id: str
+    source_system: str
+    source_table: str
+    source_pk: str
+    entity_type: str
+    canonical_id: str
+    canonical_namespace: str = "AI_MES"
+    run_id: str = ""
+    ingest_time: Optional[int] = None
+    event_time: Optional[int] = None
+    decision_time: Optional[int] = None
+    status: str = "ACTIVE"
+    confidence: float = 1.0
+    source_payload: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def source_key(self) -> str:
+        return f"{self.source_system}:{self.source_table}:{self.source_pk}"
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = asdict(self)
+        payload["source_key"] = self.source_key
+        return payload
+
+
+@dataclass
 class FeatureSnapshot:
     feature_snapshot_id: str
     correlation_id: str

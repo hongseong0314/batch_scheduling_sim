@@ -56,6 +56,8 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/runs` | Current and historical local simulator run/session index |
 | `GET /api/v2/operations` | Operation and equipment registry for simulator and future production process mapping |
 | `GET /api/v2/action-proposals` | Legacy-safe action proposals derived from validated MES commands |
+| `GET /api/v2/source-key-mappings` | Legacy source-system key to canonical AI MES id mappings |
+| `GET /api/v2/source-key-mappings/resolve` | Resolve one source-system key to a canonical AI MES id |
 | `GET /api/v2/ledger-index/{index_name}` | Run-scoped normalized SQLite index rows |
 | `GET /api/v2/genealogy/task/{task_uid}` | Run-scoped task/wafer lineage with assignments, command links, and simulator events |
 | `GET /api/v2/genealogy/equipment/{equipment_id}` | Run-scoped equipment command and process timeline |
@@ -84,6 +86,7 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/simulation/autoplay/status` | Poll autoplay and optionally step |
 | `POST /api/v2/process-tools/{tool_id}/run` | Read-only process model inference with structured input |
 | `POST /api/v2/process-chat` | Process-engineer chat over read-only process tools with LLM/fallback mode |
+| `POST /api/v2/source-key-mappings` | Upsert one legacy source-key mapping |
 
 ## Current V2 Payload Summary
 
@@ -366,6 +369,41 @@ AI layer is proposing an action to legacy MES, not directly driving equipment.
     ]
 }
 ```
+
+`POST /api/v2/source-key-mappings`, `GET /api/v2/source-key-mappings`, and
+`GET /api/v2/source-key-mappings/resolve` expose the legacy source-key mapping
+boundary. This is the first ingestion-facing contract for connecting legacy
+MES/FDC/RMS/APC/ERP identifiers to canonical AI MES ids.
+
+```python
+POST /api/v2/source-key-mappings
+{
+    "source_system": "LEGACY_MES",
+    "source_table": "WIP_LOT",
+    "source_pk": "LOT123",
+    "entity_type": "LOT",
+    "canonical_id": "LOT_CANON_123",
+    "ingest_time": 100,
+    "event_time": 90,
+    "decision_time": 120,
+    "source_payload": {"LOT_ID": "LOT123"}
+}
+
+{
+    "status": "UPSERTED",
+    "item": {
+        "mapping_id": "SKM_...",
+        "source_key": "LEGACY_MES:WIP_LOT:LOT123",
+        "canonical_id": "LOT_CANON_123",
+        "entity_type": "LOT",
+        "run_id": "RUN_..."
+    }
+}
+```
+
+The mapping record separates `event_time`, `ingest_time`, and `decision_time`.
+Policy code should consume canonical ids and decision-time state rather than raw
+source keys.
 
 `GET /api/v2/ai-dev/policy-stack` returns the active factory-built stack:
 

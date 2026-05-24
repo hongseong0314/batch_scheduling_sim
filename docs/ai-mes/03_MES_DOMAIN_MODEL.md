@@ -154,6 +154,39 @@ Important fields:
 - `execution_boundary`
 - `metadata`
 
+### SourceKeyMapping
+
+SourceKeyMapping connects a legacy source-system key to a canonical AI MES id.
+It is the first contract required for real MES/FDC/RMS/APC/ERP ingestion.
+
+Current fields:
+
+- `mapping_id`
+- `source_system`
+- `source_table`
+- `source_pk`
+- `source_key`
+- `entity_type`
+- `canonical_id`
+- `canonical_namespace`
+- `run_id`
+- `ingest_time`
+- `event_time`
+- `decision_time`
+- `status`
+- `confidence`
+- `source_payload`
+- `metadata`
+
+The important time boundary is:
+
+```text
+event_time != ingest_time != decision_time
+```
+
+Legacy adapters should preserve all three where available. The AI policy stack
+should consume canonical ids and decision-time state, not raw source keys.
+
 ### Recipe
 
 Recipe is the process-control master and runtime selection record.
@@ -340,7 +373,8 @@ The normalized index is intentionally narrow and append-oriented:
 - `command_ledger_index`,
 - `event_ledger_index`,
 - `state_snapshot_index`,
-- `genealogy_edge_index`.
+- `genealogy_edge_index`,
+- `source_key_mapping_index`.
 
 Reset starts a new `run_id` and clears only the live simulator/runtime cache.
 Historical command, event, task, lot, equipment, and state snapshot evidence

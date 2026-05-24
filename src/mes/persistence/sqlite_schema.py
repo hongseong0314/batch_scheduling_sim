@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 
-SCHEMA_VERSION = "run_index_v1"
+SCHEMA_VERSION = "source_key_mapping_v1"
 TABLES = {
     "lots": "lot_id",
     "wafers": "wafer_id",
     "equipment": "equipment_id",
     "recipes": "recipe_id",
+    "source_key_mappings": "mapping_id",
     "feature_snapshots": "feature_snapshot_id",
     "recommendations": "recommendation_id",
     "commands": "command_id",
@@ -26,6 +27,7 @@ INDEX_TABLES = (
     "event_ledger_index",
     "state_snapshot_index",
     "genealogy_edge_index",
+    "source_key_mapping_index",
 )
 
 
@@ -197,10 +199,35 @@ class SQLiteSchemaMixin:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS source_key_mapping_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT,
+                mapping_id TEXT UNIQUE NOT NULL,
+                source_system TEXT NOT NULL,
+                source_table TEXT NOT NULL,
+                source_pk TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                canonical_id TEXT NOT NULL,
+                status TEXT,
+                ingest_time INTEGER,
+                event_time INTEGER,
+                decision_time INTEGER,
+                payload TEXT NOT NULL
+            )
+            """
+        )
         for table in self.INDEX_TABLES:
             self._conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{table}_run ON {table}(run_id)"
             )
+        self._conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_source_key_mapping_lookup
+            ON source_key_mapping_index(source_system, source_table, source_pk, entity_type)
+            """
+        )
         self._conn.commit()
 
     def _table_exists(self, table: str) -> bool:
@@ -232,4 +259,3 @@ class SQLiteSchemaMixin:
                 (version,),
             )
             self._conn.commit()
-

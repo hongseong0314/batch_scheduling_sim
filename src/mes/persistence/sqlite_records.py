@@ -16,12 +16,44 @@ from src.mes.domain import (
     MESCommand,
     Recipe,
     RuleValidationResult,
+    SourceKeyMapping,
     Wafer,
 )
 
 
 class SQLiteRecordMixin:
     """JSON record persistence and cache loading helpers."""
+
+    def upsert_source_key_mapping(self, mapping: SourceKeyMapping) -> None:
+        super().upsert_source_key_mapping(mapping)
+        payload = mapping.to_dict()
+        self._upsert("source_key_mappings", mapping.mapping_id, "", payload)
+        with self._db_lock:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO source_key_mapping_index(
+                    run_id, mapping_id, source_system, source_table, source_pk,
+                    entity_type, canonical_id, status, ingest_time, event_time,
+                    decision_time, payload
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    mapping.run_id,
+                    mapping.mapping_id,
+                    mapping.source_system,
+                    mapping.source_table,
+                    mapping.source_pk,
+                    mapping.entity_type,
+                    mapping.canonical_id,
+                    mapping.status,
+                    mapping.ingest_time,
+                    mapping.event_time,
+                    mapping.decision_time,
+                    self._json(payload),
+                ),
+            )
+            self._conn.commit()
 
     def normalized_index_counts(self, run_id: Optional[str] = None) -> Dict[str, int]:
         return {
@@ -88,6 +120,10 @@ class SQLiteRecordMixin:
         for payload in self._rows("recipes", limit=self.cache_limit):
             recipe = Recipe(**payload)
             self._recipes[recipe.recipe_id] = recipe
+        for payload in self._rows("source_key_mappings", limit=self.cache_limit):
+            payload.pop("source_key", None)
+            mapping = SourceKeyMapping(**payload)
+            self._source_key_mappings[mapping.mapping_id] = mapping
         for payload in self._rows("feature_snapshots", limit=self.cache_limit):
             snapshot = FeatureSnapshot(**payload)
             self._feature_snapshots[snapshot.feature_snapshot_id] = snapshot
@@ -207,4 +243,3 @@ class SQLiteRecordMixin:
                 (record_id, correlation_id, json.dumps(payload, sort_keys=True)),
             )
             self._conn.commit()
-

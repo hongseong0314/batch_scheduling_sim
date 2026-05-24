@@ -20,6 +20,7 @@ from src.mes.domain import (
     MESCommand,
     Recipe,
     RuleValidationResult,
+    SourceKeyMapping,
     Wafer,
 )
 from src.mes.recommendations import make_id
@@ -48,6 +49,7 @@ class InMemoryMESStore:
         "event_ledger_index",
         "state_snapshot_index",
         "genealogy_edge_index",
+        "source_key_mapping_index",
     )
 
     def __init__(self):
@@ -57,6 +59,7 @@ class InMemoryMESStore:
         self._wafers: Dict[str, Wafer] = {}
         self._equipment: Dict[str, Equipment] = {}
         self._recipes: Dict[str, Recipe] = {}
+        self._source_key_mappings: Dict[str, SourceKeyMapping] = {}
         self._feature_snapshots: Dict[str, FeatureSnapshot] = {}
         self._recommendations: Dict[str, AIRecommendation] = {}
         self._validations: List[RuleValidationResult] = []
@@ -116,6 +119,7 @@ class InMemoryMESStore:
             "event_ledger_index": len(self.events(run_id=run_id)),
             "state_snapshot_index": len(self.feature_snapshots(run_id=run_id)),
             "genealogy_edge_index": 0,
+            "source_key_mapping_index": len(self.source_key_mappings(run_id=run_id)),
         }
 
     def normalized_index_rows(
@@ -161,6 +165,8 @@ class InMemoryMESStore:
                 }
                 for event in self.events(run_id=run_id)[-limit:]
             ]
+        if name == "source_key_mapping_index":
+            return [mapping.to_dict() for mapping in self.source_key_mappings(run_id=run_id)[-limit:]]
         return []
 
     def record_harness_result(
@@ -228,6 +234,56 @@ class InMemoryMESStore:
     def upsert_recipe(self, recipe: Recipe) -> None:
         self._recipes[recipe.recipe_id] = recipe
 
+    def upsert_source_key_mapping(self, mapping: SourceKeyMapping) -> None:
+        self._ensure_run_id(mapping)
+        self._source_key_mappings[mapping.mapping_id] = mapping
+
+    def source_key_mappings(
+        self,
+        source_system: Optional[str] = None,
+        entity_type: Optional[str] = None,
+        canonical_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[SourceKeyMapping]:
+        mappings = list(self._source_key_mappings.values())
+        if source_system is not None:
+            mappings = [
+                mapping for mapping in mappings if mapping.source_system == source_system
+            ]
+        if entity_type is not None:
+            mappings = [
+                mapping for mapping in mappings if mapping.entity_type == entity_type
+            ]
+        if canonical_id is not None:
+            mappings = [
+                mapping for mapping in mappings if mapping.canonical_id == canonical_id
+            ]
+        if run_id is not None:
+            mappings = [mapping for mapping in mappings if mapping.run_id == run_id]
+        return mappings
+
+    def resolve_source_key_mapping(
+        self,
+        source_system: str,
+        source_table: str,
+        source_pk: str,
+        entity_type: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> Optional[SourceKeyMapping]:
+        matches = [
+            mapping
+            for mapping in self._source_key_mappings.values()
+            if mapping.source_system == source_system
+            and mapping.source_table == source_table
+            and mapping.source_pk == source_pk
+            and mapping.status == "ACTIVE"
+        ]
+        if entity_type is not None:
+            matches = [mapping for mapping in matches if mapping.entity_type == entity_type]
+        if run_id is not None:
+            matches = [mapping for mapping in matches if mapping.run_id == run_id]
+        return matches[-1] if matches else None
+
     def sync_runtime_state(
         self,
         mes_state: Dict[str, Any],
@@ -258,6 +314,7 @@ class InMemoryMESStore:
         self._validations.clear()
         self._commands.clear()
         self._events.clear()
+        self._source_key_mappings.clear()
 
     def lots(self) -> List[Lot]:
         return list(self._lots.values())

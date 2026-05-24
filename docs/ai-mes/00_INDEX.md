@@ -23,7 +23,8 @@ should start here.
 | 8 | [08_PRODUCT_UI_FOUNDATION_V1.md](08_PRODUCT_UI_FOUNDATION_V1.md) | Product UI foundation goals, open-design usage, and frontend acceptance criteria |
 | 9 | [09_PROCESS_APC_MCP_AGENT.md](09_PROCESS_APC_MCP_AGENT.md) | Process A APC tool-calling agent, MCP server, and read-only process model API |
 | 10 | [10_OPERATION_REGISTRY_ACTION_PROPOSAL.md](10_OPERATION_REGISTRY_ACTION_PROPOSAL.md) | Production-transition operation registry and legacy-safe action proposal contract |
-| 11 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 11 | [11_LEGACY_SOURCE_KEY_MAPPING.md](11_LEGACY_SOURCE_KEY_MAPPING.md) | Legacy source-system key to canonical AI MES id mapping contract |
+| 12 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -133,6 +134,10 @@ Implemented today:
 - Action proposal boundary: validated MES commands are exposed as
   `LEGACY_MES_ACTION_PROPOSAL` records through `GET /api/v2/action-proposals`.
   These proposals explicitly set `direct_equipment_control=false`.
+- Source key mapping: legacy MES/FDC/RMS/ERP identifiers can be linked to
+  canonical AI MES ids through `SourceKeyMapping`,
+  `GET/POST /api/v2/source-key-mappings`, and the
+  `source_key_mapping_index` ledger table.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

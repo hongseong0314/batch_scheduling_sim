@@ -287,14 +287,43 @@ Future deliverables:
 - production outbox adapter and operator approval queue,
 - operation registry loading from route/equipment master data.
 
+## Phase 8.6: Legacy Source Key Mapping
+
+Status: implemented for V1 mapping contracts.
+
+Deliverables:
+
+- `SourceKeyMapping` DTO in `src/mes/domain.py`,
+- in-memory and SQLite store support for source-key mappings,
+- `source_key_mapping_index` normalized ledger table,
+- deterministic `SKM_...` mapping ids from source system/table/pk/entity/run,
+- `POST /api/v2/source-key-mappings` upsert API,
+- `GET /api/v2/source-key-mappings` list API,
+- `GET /api/v2/source-key-mappings/resolve` lookup API,
+- canonical documentation in `11_LEGACY_SOURCE_KEY_MAPPING.md`.
+
+Acceptance:
+
+- a legacy source key can be resolved to a canonical AI MES id,
+- mapping records preserve `event_time`, `ingest_time`, and `decision_time`,
+- mappings persist through SQLite reload,
+- `/api/v2/ledger-index/source_key_mapping_index` exposes mapping evidence.
+
+Future deliverables:
+
+- source-specific ingestion adapters,
+- conflict review for one source key mapping to multiple canonical ids,
+- production PostgreSQL DDL and migration scripts,
+- source-system data quality diagnostics.
+
 ## Next Priorities
 
 Recommended next build order:
 
-1. Source key mapping and legacy-safe ingestion contracts for operation,
-   equipment, lot, unit, recipe, assignment, and quality records.
-2. Proposal lifecycle records that capture legacy MES accept/modify/reject and
+1. Proposal lifecycle records that capture legacy MES accept/modify/reject and
    actual execution outcome for each Action Proposal.
+2. Legacy-safe ingestion contracts for operation, equipment, lot, unit, recipe,
+   assignment, event, and quality records using SourceKeyMapping.
 3. Event-sourced WIP reconstruction independent of live simulator state.
 4. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
    packing quality.

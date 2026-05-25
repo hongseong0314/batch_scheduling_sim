@@ -36,6 +36,15 @@ def test_control_room_css_defines_commercial_ui_primitives():
     assert ".raw-json-collapsed" in html
 
 
+def test_gantt_resource_labels_do_not_wrap_after_display_name_customization():
+    html = client.get("/mes").text
+
+    assert ".gantt-label strong" in html
+    assert ".gantt-label span" in html
+    assert "white-space: nowrap" in html
+    assert "text-overflow: ellipsis" in html
+
+
 def test_ai_dev_and_assignment_trace_use_inspector_primitives():
     html = client.get("/mes").text
 

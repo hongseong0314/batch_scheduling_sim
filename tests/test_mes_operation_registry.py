@@ -69,11 +69,14 @@ def test_operation_registry_accepts_inserted_production_operation() -> None:
 
 def test_mes_context_exposes_operation_registry_for_display_names() -> None:
     context = MESAPIContext()
-    context.env.config["stage_display_names"]["A"] = "Lithography QA"
-    context.operation_registry = build_default_operation_registry(context.env.config)
 
     assert stage_display_name(context, "A") == "Lithography QA"
-    assert equipment_display_name(context, "A_0") == "A_0"
+    assert stage_display_name(context, "B") == "Wet Clean QA"
+    assert stage_display_name(context, "C") == "Final Packing"
+    assert equipment_display_name(context, "A_0") == "LITHO-01"
+    assert equipment_display_name(context, "A_4") == "LITHO-05"
+    assert equipment_display_name(context, "B_2") == "CLEAN-03"
+    assert equipment_display_name(context, "C_2") == "PACK-03"
     assert context.operation_registry.get_operation("A").display_name == "Lithography QA"
 
 

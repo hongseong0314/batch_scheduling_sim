@@ -1277,7 +1277,8 @@
           const labelClass = row.row_type === "buffer" ? "gantt-label buffer" : "gantt-label";
           const rowName = row.label || row.machine_id;
           const rowStage = row.display_stage || row.stage;
-          return `<div class="${labelClass}"><strong>${escapeText(rowName)}</strong><span>${escapeText(rowStage)}</span></div>
+          const rowTitle = `${rowName} · ${rowStage}`;
+          return `<div class="${labelClass}" title="${escapeText(rowTitle)}"><strong>${escapeText(rowName)}</strong><span>${escapeText(rowStage)}</span></div>
             <div class="gantt-lane">${nowLine}${rowBars}</div>`;
         }).join("")}
       </div></div>`;

@@ -28,11 +28,23 @@ def build_default_env() -> ManufacturingEnv:
             "process_time_C": 2,
             "deterministic_mode": True,
             "stage_display_names": {
-                "A": "Process QA",
-                "B": "Clean QA",
-                "C": "Packing",
+                "A": "Lithography QA",
+                "B": "Wet Clean QA",
+                "C": "Final Packing",
             },
-            "equipment_display_names": {},
+            "equipment_display_names": {
+                "A_0": "LITHO-01",
+                "A_1": "LITHO-02",
+                "A_2": "LITHO-03",
+                "A_3": "LITHO-04",
+                "A_4": "LITHO-05",
+                "B_0": "CLEAN-01",
+                "B_1": "CLEAN-02",
+                "B_2": "CLEAN-03",
+                "C_0": "PACK-01",
+                "C_1": "PACK-02",
+                "C_2": "PACK-03",
+            },
         }
     )
     env.reset(seed=11)

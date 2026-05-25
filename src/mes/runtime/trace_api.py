@@ -13,6 +13,11 @@ from src.mes.runtime.candidate_portfolio import (
     latest_candidate_portfolio,
 )
 from src.mes.runtime.decision_trace import decision_chain as build_decision_chain
+from src.mes.runtime.digital_twin import (
+    canonical_candidate_preview_payload,
+    canonical_decision_state_payload,
+    canonical_twin_state_payload,
+)
 from src.mes.runtime.genealogy import (
     digital_twin_state_at as build_digital_twin_state_at,
     equipment_genealogy as build_equipment_genealogy,
@@ -83,5 +88,31 @@ def build_trace_router(context: Any) -> APIRouter:
     ) -> Dict[str, Any]:
         return build_digital_twin_state_at(context, time, run_id=run_id)
 
-    return router
+    @router.get("/api/v2/digital-twin/canonical-state")
+    def canonical_twin_state(
+        at_time: Optional[int] = Query(None, ge=0),
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return canonical_twin_state_payload(context, at_time=at_time, run_id=run_id)
 
+    @router.get("/api/v2/digital-twin/canonical-decision-state")
+    def canonical_decision_state(
+        at_time: Optional[int] = Query(None, ge=0),
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return canonical_decision_state_payload(context, at_time=at_time, run_id=run_id)
+
+    @router.get("/api/v2/digital-twin/candidate-preview")
+    def canonical_candidate_preview(
+        stage: str = Query("AUTO"),
+        at_time: Optional[int] = Query(None, ge=0),
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return canonical_candidate_preview_payload(
+            context,
+            stage=stage,
+            at_time=at_time,
+            run_id=run_id,
+        )
+
+    return router

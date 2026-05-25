@@ -355,11 +355,49 @@ Future deliverables:
 - production PostgreSQL DDL and migration scripts,
 - source-system data quality diagnostics.
 
+## Phase 8D: Production Digital Twin Backbone V1
+
+Status: implemented for canonical replay and L1 candidate preview.
+
+Deliverables:
+
+- event-sourced replay helper in `src/mes/digital_twin.py`,
+- runtime payload helpers in `src/mes/runtime/digital_twin.py`,
+- API routes:
+  - `GET /api/v2/digital-twin/canonical-state`,
+  - `GET /api/v2/digital-twin/canonical-decision-state`,
+  - `GET /api/v2/digital-twin/candidate-preview`,
+- supported canonical event semantics for wait/running/rework/hold/completed
+  unit state and equipment availability,
+- production `CANONICAL_TWIN` state source marker,
+- policy-compatible decision-state builder,
+- L1 candidate portfolio preview from canonical state,
+- canonical documentation in `14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md`.
+
+Acceptance:
+
+- canonical unit/equipment records replay into operation WIP state,
+- event-time cutoff changes reconstructed state,
+- rework events move units into `rework_pool_uids`,
+- policy-ready state has the same `tasks`, stage queues, and machine shape as
+  simulator state,
+- candidate preview generates L1 candidates from canonical state without
+  mutating simulator state.
+
+Future deliverables:
+
+- full L4 -> L3 -> L1 -> L2 -> Rule Engine -> Action Proposal preview from
+  canonical twin state,
+- source-specific adapter packages for MES/FDC/RMS/ERP event vocabularies,
+- out-of-order event conflict diagnostics,
+- production PostgreSQL event store,
+- WIP reconstruction freshness and data-quality monitoring.
+
 ## Next Priorities
 
 Recommended next build order:
 
-1. Event-sourced WIP reconstruction independent of live simulator state.
+1. Full recommendation/action-proposal preview from `CANONICAL_TWIN` state.
 2. Source-specific adapters that map MES/FDC/RMS/ERP rows into the generic
    ingestion contract.
 3. Extend read-only Agent Mode tools from Process A APC to Process B APC and C

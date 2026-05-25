@@ -69,6 +69,9 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/genealogy/lot/{lot_id}` | Run-scoped lot-level task and command rollout |
 | `GET /api/v2/execution-ledger/{correlation_id}` | Run-scoped command, rule, simulator-action, and post-state ledger |
 | `GET /api/v2/digital-twin/state-at?time=0` | Run-scoped replayable decision-state snapshot at or before time |
+| `GET /api/v2/digital-twin/canonical-state` | Event-sourced production twin state replayed from canonical ingestion records |
+| `GET /api/v2/digital-twin/canonical-decision-state` | Policy-ready decision state built from the canonical twin |
+| `GET /api/v2/digital-twin/candidate-preview` | L1 candidate preview generated from canonical twin decision state |
 | `GET /api/v2/process-tools/catalog` | Read-only process model tool catalog for LLM/MCP callers |
 | `GET /api/v2/process-chat/models` | Continue-style chat model catalog for process chat |
 | `GET /api/v2/agent-runs` | Recent Agent Mode and local fallback run records |
@@ -498,6 +501,44 @@ Ledger index names:
 ```http
 GET /api/v2/ledger-index/raw_source_record_index
 GET /api/v2/ledger-index/canonical_ingestion_index
+```
+
+### Canonical Digital Twin
+
+`GET /api/v2/digital-twin/canonical-state` replays
+`CanonicalIngestionRecord` rows into event-sourced production WIP, unit, and
+equipment state.
+
+```http
+GET /api/v2/digital-twin/canonical-state?at_time=10
+```
+
+`GET /api/v2/digital-twin/canonical-decision-state` converts that replay into
+the existing policy-compatible `decision_state` contract.
+
+```http
+GET /api/v2/digital-twin/canonical-decision-state
+```
+
+`GET /api/v2/digital-twin/candidate-preview` proves the canonical decision
+state can feed the active L1 candidate portfolio generator.
+
+```http
+GET /api/v2/digital-twin/candidate-preview?stage=A
+```
+
+The response includes:
+
+```python
+{
+    "state_source": "CANONICAL_TWIN",
+    "candidate_count": 1,
+    "items": [{"candidate_id": "CAND_A_...", "task_uids": [301, 302]}],
+    "decision_state_summary": {
+        "task_count": 2,
+        "stages": {"A": {"wait": 2, "machines": 1}}
+    }
+}
 ```
 
 The mapping record separates `event_time`, `ingest_time`, and `decision_time`.

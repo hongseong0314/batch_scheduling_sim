@@ -26,7 +26,8 @@ should start here.
 | 11 | [11_LEGACY_SOURCE_KEY_MAPPING.md](11_LEGACY_SOURCE_KEY_MAPPING.md) | Legacy source-system key to canonical AI MES id mapping contract |
 | 12 | [12_RUNTIME_CONFIG.md](12_RUNTIME_CONFIG.md) | External runtime config for simulator/display settings and production-transition naming |
 | 13 | [13_LEGACY_INGESTION_CONTRACT.md](13_LEGACY_INGESTION_CONTRACT.md) | Raw legacy record ingestion and canonical projection contract |
-| 14 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 14 | [14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md](14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md) | Event-sourced canonical digital twin and policy-ready decision state |
+| 15 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -147,6 +148,12 @@ Implemented today:
   `/api/v2/ingestion/source-records`,
   `/api/v2/ingestion/canonical-records`, `raw_source_record_index`, and
   `canonical_ingestion_index`.
+- Production digital twin backbone: canonical ingestion records can be replayed
+  into `CANONICAL_TWIN` WIP/equipment/unit state, converted to the existing
+  policy-ready `decision_state`, and previewed through L1 candidate generation
+  with `/api/v2/digital-twin/canonical-state`,
+  `/api/v2/digital-twin/canonical-decision-state`, and
+  `/api/v2/digital-twin/candidate-preview`.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

@@ -1,7 +1,7 @@
 # Operation Registry And Action Proposal
 
 Status: canonical production-transition specification  
-Last updated: 2026-05-24
+Last updated: 2026-05-25
 
 ## Purpose
 
@@ -38,9 +38,9 @@ Default simulator registry:
 
 | Operation | Display name | Type | Equipment group | Boundary |
 |---|---|---|---|---|
-| `A` | Process QA | `process_qa` | `A` | `SIMULATOR_STAGE` |
-| `B` | Clean QA | `clean_qa` | `B` | `SIMULATOR_STAGE` |
-| `C` | Packing | `packing` | `C` | `SIMULATOR_STAGE` |
+| `A` | Lithography QA | `process_qa` | `A` | `SIMULATOR_STAGE` |
+| `B` | Wet Clean QA | `clean_qa` | `B` | `SIMULATOR_STAGE` |
+| `C` | Final Packing | `packing` | `C` | `SIMULATOR_STAGE` |
 
 Default equipment is generated from simulator config:
 
@@ -48,10 +48,11 @@ Default equipment is generated from simulator config:
 - B: `B_0` ... `B_2`, batch size 2
 - C: `C_0` ... `C_2`, batch size 4
 
-The registry keeps canonical simulator ids stable. Display names are metadata.
-Policy decisions, rule validation, command payloads, and simulator actions still
-use `A`, `B`, `C`, `A_0`, `B_0`, and `C_0` unless a future adapter explicitly
-maps them to production operation/equipment ids.
+The registry keeps canonical simulator ids stable. Display names are metadata
+loaded from `config/mes-runtime.yaml` or `MES_RUNTIME_CONFIG`. Policy decisions,
+rule validation, command payloads, and simulator actions still use `A`, `B`,
+`C`, `A_0`, `B_0`, and `C_0` unless a future adapter explicitly maps them to
+production operation/equipment ids.
 
 ## Operation Definition Contract
 

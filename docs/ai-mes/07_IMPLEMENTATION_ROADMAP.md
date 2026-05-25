@@ -1,7 +1,7 @@
 # Implementation Roadmap
 
 Status: canonical  
-Last updated: 2026-05-24
+Last updated: 2026-05-25
 
 ## Guiding Principle
 
@@ -265,6 +265,8 @@ Deliverables:
 - default A/B/C simulator operations registered from runtime config,
 - configurable operation insertion path for future production process steps,
 - registry-backed stage/equipment display naming,
+- external runtime config in `config/mes-runtime.yaml` and
+  `MES_RUNTIME_CONFIG`,
 - `GET /api/v2/operations` registry API,
 - Action Proposal DTOs in `src/mes/action_proposals.py`,
 - `GET /api/v2/action-proposals` API derived from validated commands,
@@ -289,7 +291,6 @@ Acceptance:
 
 Future deliverables:
 
-- source key mapping from legacy MES/RMS/FDC/APC/ERP ids,
 - production outbox adapter and operator approval queue,
 - operation registry loading from route/equipment master data.
 

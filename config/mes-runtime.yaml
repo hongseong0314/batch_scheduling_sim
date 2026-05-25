@@ -1,0 +1,37 @@
+name: MES Runtime
+version: 0.1.0
+schema: v1
+
+simulator:
+  num_machines:
+    A: 5
+    B: 3
+    C: 3
+  batch_size:
+    A: 3
+    B: 2
+    C: 4
+  process_time:
+    A: 20
+    B: 8
+    C: 2
+  max_packs_per_step: 3
+  deterministic_mode: true
+
+display:
+  stages:
+    A: Lithography QA
+    B: Wet Clean QA
+    C: Final Packing
+  equipment:
+    A_0: LITHO-01
+    A_1: LITHO-02
+    A_2: LITHO-03
+    A_3: LITHO-04
+    A_4: LITHO-05
+    B_0: CLEAN-01
+    B_1: CLEAN-02
+    B_2: CLEAN-03
+    C_0: PACK-01
+    C_1: PACK-02
+    C_2: PACK-03

@@ -1,7 +1,7 @@
 # AI MES Canonical Documentation
 
 Status: canonical working specification
-Last updated: 2026-05-23
+Last updated: 2026-05-25
 Scope: simulator-backed semiconductor AI MES, AI decision architecture, MES
 runtime, APIs, and UI control room.
 
@@ -24,7 +24,8 @@ should start here.
 | 9 | [09_PROCESS_APC_MCP_AGENT.md](09_PROCESS_APC_MCP_AGENT.md) | Process A APC tool-calling agent, MCP server, and read-only process model API |
 | 10 | [10_OPERATION_REGISTRY_ACTION_PROPOSAL.md](10_OPERATION_REGISTRY_ACTION_PROPOSAL.md) | Production-transition operation registry and legacy-safe action proposal contract |
 | 11 | [11_LEGACY_SOURCE_KEY_MAPPING.md](11_LEGACY_SOURCE_KEY_MAPPING.md) | Legacy source-system key to canonical AI MES id mapping contract |
-| 12 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 12 | [12_RUNTIME_CONFIG.md](12_RUNTIME_CONFIG.md) | External runtime config for simulator/display settings and production-transition naming |
+| 13 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -127,7 +128,8 @@ Implemented today:
 - Display naming: canonical simulator ids (`A`, `B`, `C`, `A_0`, `B_0`,
   `C_0`) remain state/action keys, while `stage_display_names` and
   `equipment_display_names` provide configurable process/tool names for UI and
-  API display payloads.
+  API display payloads. These settings now load from `config/mes-runtime.yaml`
+  or `MES_RUNTIME_CONFIG`.
 - Operation registry: A/B/C and their equipment are exposed through
   `GET /api/v2/operations`, with operation/equipment definitions designed so
   real process steps can later be inserted from route/equipment master data.

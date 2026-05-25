@@ -10,43 +10,12 @@ from src.environment.manufacturing_env import ManufacturingEnv
 from src.mes import MESDevelopmentHarness
 from src.mes.operations.registry import build_default_operation_registry
 from src.mes.recommendations import make_id
+from src.mes.runtime.config import load_runtime_config
 from src.mes.sqlite_store import SQLiteMESStore
 
 
 def build_default_env() -> ManufacturingEnv:
-    env = ManufacturingEnv(
-        {
-            "num_machines_A": 5,
-            "num_machines_B": 3,
-            "num_machines_C": 3,
-            "batch_size_A": 3,
-            "batch_size_B": 2,
-            "batch_size_C": 4,
-            "max_packs_per_step": 3,
-            "process_time_A": 20,
-            "process_time_B": 8,
-            "process_time_C": 2,
-            "deterministic_mode": True,
-            "stage_display_names": {
-                "A": "Lithography QA",
-                "B": "Wet Clean QA",
-                "C": "Final Packing",
-            },
-            "equipment_display_names": {
-                "A_0": "LITHO-01",
-                "A_1": "LITHO-02",
-                "A_2": "LITHO-03",
-                "A_3": "LITHO-04",
-                "A_4": "LITHO-05",
-                "B_0": "CLEAN-01",
-                "B_1": "CLEAN-02",
-                "B_2": "CLEAN-03",
-                "C_0": "PACK-01",
-                "C_1": "PACK-02",
-                "C_2": "PACK-03",
-            },
-        }
-    )
+    env = ManufacturingEnv(load_runtime_config())
     env.reset(seed=11)
     return env
 

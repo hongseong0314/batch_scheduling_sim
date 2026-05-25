@@ -61,6 +61,8 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/action-proposals/{proposal_id}/lifecycle` | Combined lifecycle summary, legacy decisions, and outcomes for one proposal |
 | `GET /api/v2/source-key-mappings` | Legacy source-system key to canonical AI MES id mappings |
 | `GET /api/v2/source-key-mappings/resolve` | Resolve one source-system key to a canonical AI MES id |
+| `GET /api/v2/ingestion/source-records` | Raw legacy source rows/events preserved as ingestion evidence |
+| `GET /api/v2/ingestion/canonical-records` | Canonical AI MES projections created from ingested source records |
 | `GET /api/v2/ledger-index/{index_name}` | Run-scoped normalized SQLite index rows |
 | `GET /api/v2/genealogy/task/{task_uid}` | Run-scoped task/wafer lineage with assignments, command links, and simulator events |
 | `GET /api/v2/genealogy/equipment/{equipment_id}` | Run-scoped equipment command and process timeline |
@@ -92,6 +94,7 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `POST /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Record the legacy MES decision for an AI proposal |
 | `POST /api/v2/action-proposals/{proposal_id}/outcomes` | Record actual execution/quality evidence for an AI proposal |
 | `POST /api/v2/source-key-mappings` | Upsert one legacy source-key mapping |
+| `POST /api/v2/ingestion/source-records` | Store one raw source record and optional canonical projection |
 
 ## Current V2 Payload Summary
 
@@ -451,6 +454,50 @@ POST /api/v2/source-key-mappings
         "run_id": "RUN_..."
     }
 }
+```
+
+### Legacy Ingestion Records
+
+`POST /api/v2/ingestion/source-records` stores the original source row/event as
+`RawSourceRecord`. If the payload contains `canonical_id`, the runtime also
+creates a `CanonicalIngestionRecord` and upserts a `SourceKeyMapping`.
+
+```http
+POST /api/v2/ingestion/source-records
+```
+
+```json
+{
+  "source_system": "LEGACY_MES",
+  "source_table": "WIP_LOT",
+  "source_pk": "LOT123",
+  "entity_type": "LOT",
+  "canonical_id": "LOT_CANON_123",
+  "lot_id": "LOT_CANON_123",
+  "operation_id": "A",
+  "event_time": 90,
+  "ingest_time": 100,
+  "decision_time": 120,
+  "canonical": {
+    "event_type": "LOT_WAITING",
+    "attributes": {"priority": "HOT"}
+  },
+  "payload": {"LOT_ID": "LOT123", "OPER": "A"}
+}
+```
+
+List APIs:
+
+```http
+GET /api/v2/ingestion/source-records?source_system=LEGACY_MES&entity_type=LOT
+GET /api/v2/ingestion/canonical-records?canonical_id=LOT_CANON_123
+```
+
+Ledger index names:
+
+```http
+GET /api/v2/ledger-index/raw_source_record_index
+GET /api/v2/ledger-index/canonical_ingestion_index
 ```
 
 The mapping record separates `event_time`, `ingest_time`, and `decision_time`.

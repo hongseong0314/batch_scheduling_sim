@@ -166,6 +166,8 @@ class SQLiteMESStore(
                 "source_key_mappings",
                 "legacy_decisions",
                 "outcome_records",
+                "raw_source_records",
+                "canonical_ingestion_records",
             ):
                 self._conn.execute(f"DELETE FROM {table}")
             for table in self.INDEX_TABLES:

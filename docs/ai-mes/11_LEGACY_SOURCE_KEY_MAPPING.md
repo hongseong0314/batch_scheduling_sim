@@ -107,6 +107,11 @@ Adapters should resolve source data in this order:
 This keeps source-system identity reconstruction separate from L1/L2/L3/L4
 policy logic.
 
+Legacy Ingestion V1 now automates step 4 when an ingested source record carries
+`canonical_id`. See
+[`13_LEGACY_INGESTION_CONTRACT.md`](13_LEGACY_INGESTION_CONTRACT.md) for the
+raw/canonical ingestion record contract.
+
 ## Boundaries
 
 V1 intentionally does not implement:
@@ -118,4 +123,3 @@ V1 intentionally does not implement:
 - PostgreSQL production DDL.
 
 Those come after the canonical mapping contract is stable.
-

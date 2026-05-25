@@ -316,10 +316,42 @@ Acceptance:
 - mappings persist through SQLite reload,
 - `/api/v2/ledger-index/source_key_mapping_index` exposes mapping evidence.
 
-Future deliverables:
+Follow-on deliverables:
 
+- canonical ingestion records are handled by Phase 8C below,
 - source-specific ingestion adapters,
 - conflict review for one source key mapping to multiple canonical ids,
+- production PostgreSQL DDL and migration scripts,
+- source-system data quality diagnostics.
+
+## Phase 8C: Legacy Ingestion Contract V1
+
+Deliverables:
+
+- `RawSourceRecord` DTO in `src/mes/ingestion.py`,
+- `CanonicalIngestionRecord` DTO in `src/mes/ingestion.py`,
+- in-memory and SQLite store support for both ingestion record types,
+- `raw_source_record_index` and `canonical_ingestion_index` normalized ledger
+  tables,
+- `POST /api/v2/ingestion/source-records` ingest API,
+- `GET /api/v2/ingestion/source-records` list API,
+- `GET /api/v2/ingestion/canonical-records` list API,
+- automatic SourceKeyMapping upsert when `canonical_id` is present,
+- canonical documentation in `13_LEGACY_INGESTION_CONTRACT.md`.
+
+Acceptance:
+
+- raw source evidence persists through SQLite reload,
+- canonical projections persist through SQLite reload,
+- ingestion preserves `event_time`, `ingest_time`, and `decision_time`,
+- source-key mapping resolve works after ingestion with a canonical id,
+- raw-only records can be stored before a mapping is available.
+
+Future deliverables:
+
+- source-specific MES/FDC/RMS/ERP ingestion adapters,
+- event-sourced WIP reconstruction from canonical ingestion records,
+- conflict review workflow for mapping collisions,
 - production PostgreSQL DDL and migration scripts,
 - source-system data quality diagnostics.
 
@@ -327,9 +359,9 @@ Future deliverables:
 
 Recommended next build order:
 
-1. Legacy-safe ingestion contracts for operation, equipment, lot, unit, recipe,
-   assignment, event, and quality records using SourceKeyMapping.
-2. Event-sourced WIP reconstruction independent of live simulator state.
+1. Event-sourced WIP reconstruction independent of live simulator state.
+2. Source-specific adapters that map MES/FDC/RMS/ERP rows into the generic
+   ingestion contract.
 3. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
    packing quality.
 4. Add approval-gated write-tool contract for future L4/operator workflows,

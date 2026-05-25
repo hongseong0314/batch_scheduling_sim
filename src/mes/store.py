@@ -24,6 +24,7 @@ from src.mes.domain import (
     SourceKeyMapping,
     Wafer,
 )
+from src.mes.ingestion import CanonicalIngestionRecord, RawSourceRecord
 from src.mes.recommendations import make_id
 
 
@@ -52,6 +53,8 @@ class InMemoryMESStore:
         "genealogy_edge_index",
         "source_key_mapping_index",
         "proposal_lifecycle_index",
+        "raw_source_record_index",
+        "canonical_ingestion_index",
     )
 
     def __init__(self):
@@ -64,6 +67,8 @@ class InMemoryMESStore:
         self._source_key_mappings: Dict[str, SourceKeyMapping] = {}
         self._legacy_decisions: Dict[str, LegacyDecision] = {}
         self._outcome_records: Dict[str, OutcomeRecord] = {}
+        self._raw_source_records: Dict[str, RawSourceRecord] = {}
+        self._canonical_ingestion_records: Dict[str, CanonicalIngestionRecord] = {}
         self._feature_snapshots: Dict[str, FeatureSnapshot] = {}
         self._recommendations: Dict[str, AIRecommendation] = {}
         self._validations: List[RuleValidationResult] = []
@@ -127,6 +132,10 @@ class InMemoryMESStore:
             "proposal_lifecycle_index": (
                 len(self.legacy_decisions(run_id=run_id))
                 + len(self.outcome_records(run_id=run_id))
+            ),
+            "raw_source_record_index": len(self.raw_source_records(run_id=run_id)),
+            "canonical_ingestion_index": len(
+                self.canonical_ingestion_records(run_id=run_id)
             ),
         }
 
@@ -206,6 +215,50 @@ class InMemoryMESStore:
                     }
                 )
             return rows[-limit:]
+        if name == "raw_source_record_index":
+            return [
+                {
+                    "run_id": record.run_id,
+                    "record_id": record.record_id,
+                    "source_system": record.source_system,
+                    "source_table": record.source_table,
+                    "source_pk": record.source_pk,
+                    "source_key": record.source_key,
+                    "entity_type": record.entity_type,
+                    "operation_id": record.operation_id,
+                    "equipment_id": record.equipment_id,
+                    "lot_id": record.lot_id,
+                    "unit_id": record.unit_id,
+                    "recipe_id": record.recipe_id,
+                    "status": record.status,
+                    "event_time": record.event_time,
+                    "ingest_time": record.ingest_time,
+                    "decision_time": record.decision_time,
+                    "payload": record.to_dict(),
+                }
+                for record in self.raw_source_records(run_id=run_id)[-limit:]
+            ]
+        if name == "canonical_ingestion_index":
+            return [
+                {
+                    "run_id": record.run_id,
+                    "record_id": record.record_id,
+                    "raw_record_id": record.raw_record_id,
+                    "entity_type": record.entity_type,
+                    "canonical_id": record.canonical_id,
+                    "operation_id": record.operation_id,
+                    "equipment_id": record.equipment_id,
+                    "lot_id": record.lot_id,
+                    "unit_id": record.unit_id,
+                    "recipe_id": record.recipe_id,
+                    "event_type": record.event_type,
+                    "event_time": record.event_time,
+                    "ingest_time": record.ingest_time,
+                    "decision_time": record.decision_time,
+                    "payload": record.to_dict(),
+                }
+                for record in self.canonical_ingestion_records(run_id=run_id)[-limit:]
+            ]
         return []
 
     def record_harness_result(
@@ -288,6 +341,14 @@ class InMemoryMESStore:
         if not outcome.outcome_id:
             outcome.outcome_id = make_id("OUT")
         self._outcome_records[outcome.outcome_id] = outcome
+
+    def add_raw_source_record(self, record: RawSourceRecord) -> None:
+        self._ensure_run_id(record)
+        self._raw_source_records[record.record_id] = record
+
+    def add_canonical_ingestion_record(self, record: CanonicalIngestionRecord) -> None:
+        self._ensure_run_id(record)
+        self._canonical_ingestion_records[record.record_id] = record
 
     def source_key_mappings(
         self,
@@ -375,6 +436,57 @@ class InMemoryMESStore:
             outcomes = [outcome for outcome in outcomes if outcome.run_id == run_id]
         return outcomes
 
+    def raw_source_records(
+        self,
+        source_system: Optional[str] = None,
+        entity_type: Optional[str] = None,
+        record_id: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_pk: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[RawSourceRecord]:
+        records = list(self._raw_source_records.values())
+        if source_system is not None:
+            records = [
+                record for record in records if record.source_system == source_system
+            ]
+        if entity_type is not None:
+            records = [record for record in records if record.entity_type == entity_type]
+        if record_id is not None:
+            records = [record for record in records if record.record_id == record_id]
+        if source_table is not None:
+            records = [record for record in records if record.source_table == source_table]
+        if source_pk is not None:
+            records = [record for record in records if record.source_pk == source_pk]
+        if run_id is not None:
+            records = [record for record in records if record.run_id == run_id]
+        return records
+
+    def canonical_ingestion_records(
+        self,
+        entity_type: Optional[str] = None,
+        canonical_id: Optional[str] = None,
+        raw_record_id: Optional[str] = None,
+        record_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[CanonicalIngestionRecord]:
+        records = list(self._canonical_ingestion_records.values())
+        if entity_type is not None:
+            records = [record for record in records if record.entity_type == entity_type]
+        if canonical_id is not None:
+            records = [
+                record for record in records if record.canonical_id == canonical_id
+            ]
+        if raw_record_id is not None:
+            records = [
+                record for record in records if record.raw_record_id == raw_record_id
+            ]
+        if record_id is not None:
+            records = [record for record in records if record.record_id == record_id]
+        if run_id is not None:
+            records = [record for record in records if record.run_id == run_id]
+        return records
+
     def sync_runtime_state(
         self,
         mes_state: Dict[str, Any],
@@ -408,6 +520,8 @@ class InMemoryMESStore:
         self._source_key_mappings.clear()
         self._legacy_decisions.clear()
         self._outcome_records.clear()
+        self._raw_source_records.clear()
+        self._canonical_ingestion_records.clear()
 
     def lots(self) -> List[Lot]:
         return list(self._lots.values())

@@ -25,7 +25,8 @@ should start here.
 | 10 | [10_OPERATION_REGISTRY_ACTION_PROPOSAL.md](10_OPERATION_REGISTRY_ACTION_PROPOSAL.md) | Production-transition operation registry and legacy-safe action proposal contract |
 | 11 | [11_LEGACY_SOURCE_KEY_MAPPING.md](11_LEGACY_SOURCE_KEY_MAPPING.md) | Legacy source-system key to canonical AI MES id mapping contract |
 | 12 | [12_RUNTIME_CONFIG.md](12_RUNTIME_CONFIG.md) | External runtime config for simulator/display settings and production-transition naming |
-| 13 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 13 | [13_LEGACY_INGESTION_CONTRACT.md](13_LEGACY_INGESTION_CONTRACT.md) | Raw legacy record ingestion and canonical projection contract |
+| 14 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -140,6 +141,12 @@ Implemented today:
   canonical AI MES ids through `SourceKeyMapping`,
   `GET/POST /api/v2/source-key-mappings`, and the
   `source_key_mapping_index` ledger table.
+- Legacy ingestion contract: source rows/events can be stored as immutable
+  `RawSourceRecord` evidence, projected into `CanonicalIngestionRecord`, linked
+  to `SourceKeyMapping`, and exposed through
+  `/api/v2/ingestion/source-records`,
+  `/api/v2/ingestion/canonical-records`, `raw_source_record_index`, and
+  `canonical_ingestion_index`.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

@@ -14,6 +14,11 @@ from src.mes.action_proposals import (
     legacy_decision_from_payload,
     outcome_record_from_payload,
 )
+from src.mes.runtime.legacy_ingestion import (
+    canonical_ingestion_records_payload,
+    ingest_source_record_payload,
+    raw_source_records_payload,
+)
 from src.mes.runtime.operations import operations_payload
 from src.mes.runtime.source_key_mappings import (
     resolve_source_key_mapping_payload,
@@ -158,6 +163,48 @@ def build_production_boundary_router(context: Any) -> APIRouter:
             source_table=source_table,
             source_pk=source_pk,
             entity_type=entity_type,
+            run_id=run_id,
+        )
+
+    @router.post("/api/v2/ingestion/source-records")
+    def ingest_source_record(
+        payload: Dict[str, Any] = Body(default_factory=dict),
+    ) -> Dict[str, Any]:
+        return ingest_source_record_payload(context, payload)
+
+    @router.get("/api/v2/ingestion/source-records")
+    def raw_source_records(
+        source_system: Optional[str] = Query(None),
+        entity_type: Optional[str] = Query(None),
+        record_id: Optional[str] = Query(None),
+        source_table: Optional[str] = Query(None),
+        source_pk: Optional[str] = Query(None),
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return raw_source_records_payload(
+            context,
+            source_system=source_system,
+            entity_type=entity_type,
+            record_id=record_id,
+            source_table=source_table,
+            source_pk=source_pk,
+            run_id=run_id,
+        )
+
+    @router.get("/api/v2/ingestion/canonical-records")
+    def canonical_ingestion_records(
+        entity_type: Optional[str] = Query(None),
+        canonical_id: Optional[str] = Query(None),
+        raw_record_id: Optional[str] = Query(None),
+        record_id: Optional[str] = Query(None),
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return canonical_ingestion_records_payload(
+            context,
+            entity_type=entity_type,
+            canonical_id=canonical_id,
+            raw_record_id=raw_record_id,
+            record_id=record_id,
             run_id=run_id,
         )
 

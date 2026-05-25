@@ -187,6 +187,60 @@ event_time != ingest_time != decision_time
 Legacy adapters should preserve all three where available. The AI policy stack
 should consume canonical ids and decision-time state, not raw source keys.
 
+### RawSourceRecord
+
+RawSourceRecord preserves the original row/event received from MES, RMS, FDC,
+APC, ERP, or engineering data sources. It is audit evidence, not policy input.
+
+Current fields:
+
+- `record_id`
+- `source_system`
+- `source_table`
+- `source_pk`
+- `source_key`
+- `entity_type`
+- `operation_id`
+- `equipment_id`
+- `lot_id`
+- `unit_id`
+- `recipe_id`
+- `event_time`
+- `ingest_time`
+- `decision_time`
+- `status`
+- `payload`
+- `metadata`
+- `run_id`
+
+### CanonicalIngestionRecord
+
+CanonicalIngestionRecord is the normalized projection created from a
+RawSourceRecord. This is the shape future WIP reconstruction, genealogy,
+KPI evaluation, and policy training should consume.
+
+Current fields:
+
+- `record_id`
+- `raw_record_id`
+- `entity_type`
+- `canonical_id`
+- `canonical_namespace`
+- `operation_id`
+- `equipment_id`
+- `lot_id`
+- `unit_id`
+- `recipe_id`
+- `event_type`
+- `event_time`
+- `ingest_time`
+- `decision_time`
+- `attributes`
+- `measurements`
+- `quality_result`
+- `payload`
+- `run_id`
+
 ### Recipe
 
 Recipe is the process-control master and runtime selection record.

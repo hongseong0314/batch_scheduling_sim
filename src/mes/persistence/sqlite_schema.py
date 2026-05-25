@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 
-SCHEMA_VERSION = "proposal_lifecycle_v1"
+SCHEMA_VERSION = "legacy_ingestion_v1"
 TABLES = {
     "lots": "lot_id",
     "wafers": "wafer_id",
@@ -13,6 +13,8 @@ TABLES = {
     "source_key_mappings": "mapping_id",
     "legacy_decisions": "decision_id",
     "outcome_records": "outcome_id",
+    "raw_source_records": "record_id",
+    "canonical_ingestion_records": "record_id",
     "feature_snapshots": "feature_snapshot_id",
     "recommendations": "recommendation_id",
     "commands": "command_id",
@@ -31,6 +33,8 @@ INDEX_TABLES = (
     "genealogy_edge_index",
     "source_key_mapping_index",
     "proposal_lifecycle_index",
+    "raw_source_record_index",
+    "canonical_ingestion_index",
 )
 
 
@@ -237,6 +241,52 @@ class SQLiteSchemaMixin:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS raw_source_record_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT,
+                record_id TEXT UNIQUE NOT NULL,
+                source_system TEXT NOT NULL,
+                source_table TEXT NOT NULL,
+                source_pk TEXT NOT NULL,
+                source_key TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                operation_id TEXT,
+                equipment_id TEXT,
+                lot_id TEXT,
+                unit_id TEXT,
+                recipe_id TEXT,
+                status TEXT,
+                ingest_time INTEGER,
+                event_time INTEGER,
+                decision_time INTEGER,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS canonical_ingestion_index (
+                row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT,
+                record_id TEXT UNIQUE NOT NULL,
+                raw_record_id TEXT,
+                entity_type TEXT NOT NULL,
+                canonical_id TEXT NOT NULL,
+                operation_id TEXT,
+                equipment_id TEXT,
+                lot_id TEXT,
+                unit_id TEXT,
+                recipe_id TEXT,
+                event_type TEXT,
+                ingest_time INTEGER,
+                event_time INTEGER,
+                decision_time INTEGER,
+                payload TEXT NOT NULL
+            )
+            """
+        )
         for table in self.INDEX_TABLES:
             self._conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{table}_run ON {table}(run_id)"
@@ -251,6 +301,18 @@ class SQLiteSchemaMixin:
             """
             CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_proposal
             ON proposal_lifecycle_index(proposal_id, record_type)
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_raw_source_record_lookup
+            ON raw_source_record_index(source_system, source_table, source_pk, entity_type)
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_canonical_ingestion_lookup
+            ON canonical_ingestion_index(canonical_id, entity_type)
             """
         )
         self._conn.commit()

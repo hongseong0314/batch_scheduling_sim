@@ -20,6 +20,7 @@ from src.mes.domain import (
     SourceKeyMapping,
     Wafer,
 )
+from src.mes.ingestion import CanonicalIngestionRecord, RawSourceRecord
 
 
 class SQLiteRecordMixin:
@@ -64,6 +65,80 @@ class SQLiteRecordMixin:
             event_time=outcome.event_time,
             payload=payload,
         )
+
+    def add_raw_source_record(self, record: RawSourceRecord) -> None:
+        super().add_raw_source_record(record)
+        payload = record.to_dict()
+        self._upsert("raw_source_records", record.record_id, "", payload)
+        with self._db_lock:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO raw_source_record_index(
+                    run_id, record_id, source_system, source_table, source_pk,
+                    source_key, entity_type, operation_id, equipment_id, lot_id,
+                    unit_id, recipe_id, status, ingest_time, event_time,
+                    decision_time, payload
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.run_id,
+                    record.record_id,
+                    record.source_system,
+                    record.source_table,
+                    record.source_pk,
+                    record.source_key,
+                    record.entity_type,
+                    record.operation_id,
+                    record.equipment_id,
+                    record.lot_id,
+                    record.unit_id,
+                    record.recipe_id,
+                    record.status,
+                    record.ingest_time,
+                    record.event_time,
+                    record.decision_time,
+                    self._json(payload),
+                ),
+            )
+            self._conn.commit()
+
+    def add_canonical_ingestion_record(
+        self,
+        record: CanonicalIngestionRecord,
+    ) -> None:
+        super().add_canonical_ingestion_record(record)
+        payload = record.to_dict()
+        self._upsert("canonical_ingestion_records", record.record_id, "", payload)
+        with self._db_lock:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO canonical_ingestion_index(
+                    run_id, record_id, raw_record_id, entity_type, canonical_id,
+                    operation_id, equipment_id, lot_id, unit_id, recipe_id,
+                    event_type, ingest_time, event_time, decision_time, payload
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.run_id,
+                    record.record_id,
+                    record.raw_record_id,
+                    record.entity_type,
+                    record.canonical_id,
+                    record.operation_id,
+                    record.equipment_id,
+                    record.lot_id,
+                    record.unit_id,
+                    record.recipe_id,
+                    record.event_type,
+                    record.ingest_time,
+                    record.event_time,
+                    record.decision_time,
+                    self._json(payload),
+                ),
+            )
+            self._conn.commit()
 
     def upsert_source_key_mapping(self, mapping: SourceKeyMapping) -> None:
         super().upsert_source_key_mapping(mapping)
@@ -171,6 +246,16 @@ class SQLiteRecordMixin:
         for payload in self._rows("outcome_records", limit=self.cache_limit):
             outcome = OutcomeRecord(**payload)
             self._outcome_records[outcome.outcome_id] = outcome
+        for payload in self._rows("raw_source_records", limit=self.cache_limit):
+            payload.pop("source_key", None)
+            record = RawSourceRecord(**payload)
+            self._raw_source_records[record.record_id] = record
+        for payload in self._rows(
+            "canonical_ingestion_records",
+            limit=self.cache_limit,
+        ):
+            record = CanonicalIngestionRecord(**payload)
+            self._canonical_ingestion_records[record.record_id] = record
         for payload in self._rows("feature_snapshots", limit=self.cache_limit):
             snapshot = FeatureSnapshot(**payload)
             self._feature_snapshots[snapshot.feature_snapshot_id] = snapshot

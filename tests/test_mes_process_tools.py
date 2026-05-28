@@ -37,6 +37,9 @@ def test_process_tool_catalog_exposes_continue_ready_schema() -> None:
     tool = next(item for item in catalog["tools"] if item["id"] == "predict_process_a_apc")
     assert tool["name"] == "predict_process_a_apc"
     assert tool["read_only"] is True
+    assert tool["layer"] == "L2"
+    assert tool["operation_id"] == "A"
+    assert tool["policy_id"] == "A_RULE_BASED_APC_PREDICTOR"
     assert tool["input_schema"]["type"] == "object"
     assert "task_rows" in tool["input_schema"]["properties"]
     assert "machine_state" in tool["input_schema"]["properties"]

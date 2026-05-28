@@ -7,7 +7,9 @@ Last updated: 2026-05-22
 
 Process APC MCP Agent V1 lets a process engineer ask a natural-language MES/APC
 question and have a local LLM call read-only process and runtime inspection
-tools. The first process model tool is Process A APC prediction.
+tools. The standalone process-model API starts with Process A APC prediction.
+Agent Mode additionally exposes the A/B/C layered decision tools used by the
+MES policy stack.
 
 V1 is intentionally read-only. It predicts, compares, and explains. It does not
 apply recipes, update MES records, dispatch lots, or execute equipment commands.
@@ -107,7 +109,8 @@ Compatibility details:
 | `src/mes/agent_runtime/ollama_client.py` | Ollama `/api/chat` client with tool schema support |
 | `src/mes/agent_runtime/openai_client.py` | OpenAI-compatible `/chat/completions` client with tool schema support |
 | `src/mes/agent_runtime/mcp_client.py` | Synchronous MCP stdio client wrapper |
-| `src/mes/agent_runtime/mes_tools.py` | Read-only MES runtime tool registry for Agent Mode |
+| `src/mes/agent_runtime/layered_process_tools.py` | A/B/C L1 candidate and L2 annotation tools for Agent Mode |
+| `src/mes/agent_runtime/mes_tools.py` | Read-only MES runtime and layered process tool registry for Agent Mode |
 | `src/mes/agent_runtime/agent_loop.py` | Multi-step Agent/Chat loop, tool policy, and final response generation |
 | `src/mes/agent_runtime/process_chat.py` | Chat facade with LLM mode and local A APC fallback |
 | `src/mes/agent_runtime/run_store.py` | Recent agent run records for inspector/debug APIs |
@@ -161,6 +164,32 @@ chat service is running inside the MES API process:
 - `get_candidate_portfolio_latest`
 - `get_equipment_detail`
 - `get_assignment_trace`
+
+Agent Mode also exposes the A/B/C layered process tools documented in
+`16_ABC_CANONICAL_SCHEMA_REFERENCE.md`.
+
+L1 candidate tools:
+
+```text
+generate_process_a_l1_candidates
+generate_process_b_l1_candidates
+generate_process_c_l1_candidates
+```
+
+L2 annotation tools:
+
+```text
+annotate_process_a_l2_apc
+annotate_process_b_l2_apc
+annotate_process_c_l2_pack_quality
+```
+
+All six tools are read-only and execute against the current MES decision state.
+Each tool returns `layer`, `operation_id`, `policy_id`, `decision_time`,
+diagnostics, and candidate or annotation rows. L1 tools expose local feasible
+candidates; L2 tools expose APC/process implication for those candidates. L3/L4
+selection remains separate and can be inspected through policy, portfolio, and
+trace tools.
 
 ## REST API
 
@@ -236,8 +265,9 @@ opens `/mes#chat` and renders:
 - an LLM toggle,
 - a model selector built from the Continue-style `models` config,
 - the read-only MES/API tool context,
-- starter A APC questions,
-- tool-call metadata and compact agent trace for returned tool calls.
+- starter A APC, A L1/L2, C packing, and Fab state questions,
+- tool-call metadata and compact agent trace with layer, operation id, and
+  policy id for returned tool calls.
 
 The AI Developer Console also includes Agent Run Inspector. It lists recent
 agent runs from `/api/v2/agent-runs`, lets developers select one run, and shows
@@ -294,6 +324,10 @@ The server exposes:
 get_process_tool_catalog
 predict_process_a_apc
 ```
+
+The MCP server remains the standalone process-tool server. A/B/C L1/L2 tools
+currently require the live MES runtime context and are exposed through
+`/mes#chat` Agent Mode rather than the stdio MCP server.
 
 ## Local Agent CLI
 

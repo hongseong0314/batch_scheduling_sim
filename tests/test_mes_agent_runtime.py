@@ -140,6 +140,9 @@ class FakeAgentToolService:
                     "name": "predict_process_a_apc",
                     "description": "Predict A APC.",
                     "read_only": True,
+                    "layer": "L2",
+                    "operation_id": "A",
+                    "policy_id": "A_RULE_BASED_APC_PREDICTOR",
                     "input_schema": {"type": "object", "properties": {}},
                 },
                 {
@@ -190,6 +193,9 @@ def test_agent_runtime_runs_multi_step_until_final_answer() -> None:
         "get_fab_snapshot",
         "predict_process_a_apc",
     ]
+    assert result["tool_calls"][1]["layer"] == "L2"
+    assert result["tool_calls"][1]["operation_id"] == "A"
+    assert result["tool_calls"][1]["policy_id"] == "A_RULE_BASED_APC_PREDICTOR"
     assert [step["type"] for step in result["agent_trace"]] == [
         "llm_response",
         "tool_call",

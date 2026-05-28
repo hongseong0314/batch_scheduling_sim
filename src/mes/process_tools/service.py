@@ -20,6 +20,9 @@ class ProcessToolService:
                 "id": "predict_process_a_apc",
                 "name": "predict_process_a_apc",
                 "stage": "A",
+                "operation_id": "A",
+                "layer": "L2",
+                "policy_id": "A_RULE_BASED_APC_PREDICTOR",
                 "read_only": True,
                 "description": (
                     "Predict Process A APC quality for a proposed task batch, "

@@ -28,7 +28,8 @@ should start here.
 | 13 | [13_LEGACY_INGESTION_CONTRACT.md](13_LEGACY_INGESTION_CONTRACT.md) | Raw legacy record ingestion and canonical projection contract |
 | 14 | [14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md](14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md) | Event-sourced canonical digital twin and policy-ready decision state |
 | 15 | [15_PRODUCTION_MES_V1_GOALS.md](15_PRODUCTION_MES_V1_GOALS.md) | Six-axis production MES V1 implementation summary |
-| 16 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 16 | [16_ABC_CANONICAL_SCHEMA_REFERENCE.md](16_ABC_CANONICAL_SCHEMA_REFERENCE.md) | Concrete A/B/C canonical schema, L1 candidate, L2 annotation, and LLM tool reference |
+| 17 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -119,10 +120,12 @@ Implemented today:
 - API/UI: live simulator-backed MES endpoints and a dense `/mes` control room
   with Candidate Portfolio, Assignment Trace, AI Developer Console, Policy
   Experiment Runner, Product UI Foundation, and Digital Twin Genealogy V1.
-- Process APC/MES tool calling: read-only Process A APC prediction and MES
-  runtime inspection tools are exposed through `src/mes/process_tools/`,
-  `/api/v2/process-tools/*`, `src/mes/mcp/process_apc_server.py`, and the local
-  Continue-inspired `src/mes/agent_runtime/` runtime. The control room also
+- Process APC/MES tool calling: read-only Process A APC prediction is exposed
+  through `src/mes/process_tools/`, `/api/v2/process-tools/*`, and
+  `src/mes/mcp/process_apc_server.py`. A/B/C L1 candidate tools, A/B/C L2
+  annotation tools, and MES runtime inspection tools are exposed to Agent Mode
+  through the local Continue-inspired `src/mes/agent_runtime/` runtime. The
+  control room also
   exposes `/mes#chat` for process-engineer natural-language MES/APC questions
   with Agent Mode, Chat Mode, model selection, compact tool traces, and
   SQLite-backed `agent_run_id` records. `/mes#ai-dev` includes Agent Run

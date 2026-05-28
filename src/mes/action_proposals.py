@@ -226,6 +226,55 @@ def action_proposal_lifecycle_payload(
     }
 
 
+def action_proposal_feedback_summary(
+    context: Any,
+    proposal_id: str,
+    run_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    store = context.harness.store
+    proposal = _proposal_by_id(context, proposal_id, run_id=run_id)
+    decisions = _store_records(store, "legacy_decisions", proposal_id, run_id=run_id)
+    outcomes = _store_records(store, "outcome_records", proposal_id, run_id=run_id)
+    latest_decision = decisions[-1] if decisions else None
+    latest_outcome = outcomes[-1] if outcomes else None
+    proposed_equipment = str((proposal or {}).get("target_equipment_id") or "")
+    proposed_units = [str(value) for value in (proposal or {}).get("target_unit_ids", [])]
+    actual_equipment = str(
+        getattr(latest_outcome, "actual_equipment_id", "")
+        or getattr(latest_decision, "actual_equipment_id", "")
+    )
+    actual_units = [
+        str(value)
+        for value in (
+            getattr(latest_outcome, "actual_unit_ids", None)
+            or getattr(latest_decision, "actual_unit_ids", None)
+            or []
+        )
+    ]
+    return {
+        "proposal_id": proposal_id,
+        "run_id": run_id,
+        "proposal": proposal,
+        "summary": action_proposal_lifecycle_summary(store, proposal_id, run_id=run_id),
+        "actual_vs_proposed": {
+            "proposed_equipment_id": proposed_equipment,
+            "actual_equipment_id": actual_equipment,
+            "equipment_changed": bool(actual_equipment and actual_equipment != proposed_equipment),
+            "proposed_unit_ids": proposed_units,
+            "actual_unit_ids": actual_units,
+            "unit_set_changed": bool(actual_units and set(actual_units) != set(proposed_units)),
+        },
+        "learning_signal": {
+            "usable_for_policy_evaluation": bool(latest_decision and latest_outcome),
+            "legacy_status": getattr(latest_decision, "legacy_status", ""),
+            "outcome_status": getattr(latest_outcome, "outcome_status", ""),
+            "quality_result": dict(getattr(latest_outcome, "quality_result", {}) or {}),
+            "cycle_time": getattr(latest_outcome, "cycle_time", None),
+            "rework_count": getattr(latest_outcome, "rework_count", 0),
+        },
+    }
+
+
 def _proposal_with_registry_mode(context: Any, command: MESCommand) -> ActionProposal:
     mode = "SIMULATOR_ONLY"
     registry = getattr(context, "operation_registry", None)
@@ -240,6 +289,18 @@ def _proposal_with_registry_mode(context: Any, command: MESCommand) -> ActionPro
         if operation is not None:
             mode = operation.legacy_submission_mode
     return action_proposal_from_command(command, legacy_submission_mode=mode)
+
+
+def _proposal_by_id(
+    context: Any,
+    proposal_id: str,
+    run_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    payload = action_proposals_payload(context, run_id=run_id)
+    for item in payload.get("items", []):
+        if item.get("proposal_id") == proposal_id:
+            return item
+    return {}
 
 
 def _operation_from_command(command: MESCommand) -> str:

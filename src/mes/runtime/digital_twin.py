@@ -5,10 +5,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from src.mes.action_proposals import action_proposal_from_command
 from src.mes.digital_twin import (
     build_canonical_decision_state,
     build_digital_twin_state,
 )
+from src.mes.recommendations import make_id
 from src.mes.runtime.common import normalize_target_stage
 
 
@@ -78,6 +80,58 @@ def canonical_candidate_preview_payload(
         "candidate_count": len(candidates),
         "items": candidates,
         "decision_state_summary": _decision_state_summary(decision_state),
+    }
+
+
+def run_canonical_recommendation_payload(
+    context: Any,
+    payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    target_stage = normalize_target_stage(payload.get("stage"), default="AUTO")
+    at_time = payload.get("at_time")
+    run_id = payload.get("run_id")
+    decision_payload = canonical_decision_state_payload(
+        context,
+        at_time=int(at_time) if at_time is not None else None,
+        run_id=str(run_id) if run_id else None,
+    )
+    decision_state = dict(decision_payload["decision_state"])
+    correlation_id = str(payload.get("correlation_id") or make_id("CORR_CANON"))
+    result = context.harness.run(
+        decision_state,
+        target_stage=None if target_stage == "AUTO" else target_stage,
+        correlation_id=correlation_id,
+    )
+    command = result.command
+    if command is not None:
+        command.validated_command.setdefault("state_source", "CANONICAL_TWIN")
+        command.validated_command.setdefault("production_recommendation_mode", "CANONICAL_TWIN_PREVIEW")
+        context.harness.store.add_command(command)
+        proposal = action_proposal_from_command(
+            command,
+            legacy_submission_mode="LEGACY_MES_REVIEW",
+        ).to_dict()
+    else:
+        proposal = None
+    context.last_correlation_id = correlation_id
+    return {
+        "source": "canonical_ingestion",
+        "state_source": "CANONICAL_TWIN",
+        "run_id": decision_payload["run_id"],
+        "correlation_id": correlation_id,
+        "target_stage": target_stage,
+        "record_count": decision_payload["record_count"],
+        "result": {
+            "passed": result.passed,
+            "status": result.evaluation.status,
+            "issues": list(result.evaluation.issues),
+            "validation_status": result.generated.validation.validation_status,
+            "validation_reasons": list(result.generated.validation.reasons),
+        },
+        "command": command.to_dict() if command is not None else None,
+        "action_proposal": proposal,
+        "recommendation_count": len(result.generated.recommendations),
+        "feature_snapshot_count": len(result.generated.feature_snapshots),
     }
 
 

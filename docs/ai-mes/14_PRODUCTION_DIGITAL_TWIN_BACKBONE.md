@@ -118,6 +118,25 @@ Preview L1 candidates from canonical state:
 GET /api/v2/digital-twin/candidate-preview?stage=A
 ```
 
+Run the full recommendation chain from canonical state:
+
+```http
+POST /api/v2/digital-twin/recommendation-run
+```
+
+This executes:
+
+```text
+CANONICAL_TWIN decision_state
+-> L4 objective
+-> L3 selection
+-> L1 selected allocation
+-> L2 APC/recipe annotation
+-> Rule Engine
+-> MESCommand
+-> ActionProposal
+```
+
 The preview is intentionally read-only. It proves that production-shaped
 canonical records can feed the same candidate-generation path as simulator
 state.

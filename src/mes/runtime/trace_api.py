@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Query
+from fastapi import Body
 
 from src.mes.runtime.assignment_trace import assignment_trace as build_assignment_trace
 from src.mes.runtime.candidate_portfolio import (
@@ -17,6 +18,7 @@ from src.mes.runtime.digital_twin import (
     canonical_candidate_preview_payload,
     canonical_decision_state_payload,
     canonical_twin_state_payload,
+    run_canonical_recommendation_payload,
 )
 from src.mes.runtime.genealogy import (
     digital_twin_state_at as build_digital_twin_state_at,
@@ -114,5 +116,11 @@ def build_trace_router(context: Any) -> APIRouter:
             at_time=at_time,
             run_id=run_id,
         )
+
+    @router.post("/api/v2/digital-twin/recommendation-run")
+    def canonical_recommendation_run(
+        payload: Dict[str, Any] = Body(default_factory=dict),
+    ) -> Dict[str, Any]:
+        return run_canonical_recommendation_payload(context, payload)
 
     return router

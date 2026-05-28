@@ -13,6 +13,7 @@ from src.mes.runtime.ai_dev import (
     policy_stack_payload,
 )
 from src.mes.runtime.experiments import (
+    capture_canonical_scenario,
     capture_scenario,
     get_experiment,
     list_experiments,
@@ -41,6 +42,16 @@ def build_ai_dev_router(context: Any) -> APIRouter:
     def ai_dev_capture_scenario() -> Dict[str, Any]:
         return capture_scenario(context)
 
+    @router.post("/api/v2/ai-dev/scenarios/capture-canonical")
+    def ai_dev_capture_canonical_scenario(
+        payload: Dict[str, Any] = Body(default_factory=dict),
+    ) -> Dict[str, Any]:
+        return capture_canonical_scenario(
+            context,
+            at_time=payload.get("at_time"),
+            run_id=payload.get("run_id"),
+        )
+
     @router.get("/api/v2/ai-dev/scenarios")
     def ai_dev_scenarios() -> Dict[str, Any]:
         return list_scenarios(context)
@@ -68,4 +79,3 @@ def build_ai_dev_router(context: Any) -> APIRouter:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return router
-

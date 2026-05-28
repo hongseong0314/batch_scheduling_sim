@@ -27,7 +27,8 @@ should start here.
 | 12 | [12_RUNTIME_CONFIG.md](12_RUNTIME_CONFIG.md) | External runtime config for simulator/display settings and production-transition naming |
 | 13 | [13_LEGACY_INGESTION_CONTRACT.md](13_LEGACY_INGESTION_CONTRACT.md) | Raw legacy record ingestion and canonical projection contract |
 | 14 | [14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md](14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md) | Event-sourced canonical digital twin and policy-ready decision state |
-| 15 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 15 | [15_PRODUCTION_MES_V1_GOALS.md](15_PRODUCTION_MES_V1_GOALS.md) | Six-axis production MES V1 implementation summary |
+| 16 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -154,6 +155,11 @@ Implemented today:
   with `/api/v2/digital-twin/canonical-state`,
   `/api/v2/digital-twin/canonical-decision-state`, and
   `/api/v2/digital-twin/candidate-preview`.
+- Production MES V1: canonical twin recommendations now run the full policy
+  stack into legacy-safe action proposals; source-specific adapters, route
+  graph, feedback summary, canonical scenario experiments, and production
+  readiness diagnostics are documented in
+  `15_PRODUCTION_MES_V1_GOALS.md`.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

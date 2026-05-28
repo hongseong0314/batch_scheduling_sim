@@ -10,16 +10,19 @@ from fastapi import APIRouter, Body, Query
 from src.mes.action_proposals import (
     action_proposal_lifecycle_payload,
     action_proposal_lifecycle_summary,
+    action_proposal_feedback_summary,
     action_proposals_payload,
     legacy_decision_from_payload,
     outcome_record_from_payload,
 )
+from src.mes.legacy_adapters import legacy_adapter_catalog, legacy_adapter_payload
 from src.mes.runtime.legacy_ingestion import (
     canonical_ingestion_records_payload,
     ingest_source_record_payload,
     raw_source_records_payload,
 )
-from src.mes.runtime.operations import operations_payload
+from src.mes.runtime.operations import operations_payload, route_graph_payload
+from src.mes.runtime.production_readiness import production_readiness_payload
 from src.mes.runtime.source_key_mappings import (
     resolve_source_key_mapping_payload,
     source_key_mappings_payload,
@@ -33,6 +36,14 @@ def build_production_boundary_router(context: Any) -> APIRouter:
     @router.get("/api/v2/operations")
     def operations() -> Dict[str, Any]:
         return operations_payload(context)
+
+    @router.get("/api/v2/operations/route-graph")
+    def route_graph() -> Dict[str, Any]:
+        return route_graph_payload(context)
+
+    @router.get("/api/v2/production-readiness")
+    def production_readiness() -> Dict[str, Any]:
+        return production_readiness_payload(context)
 
     @router.get("/api/v2/action-proposals")
     def action_proposals(
@@ -127,6 +138,32 @@ def build_production_boundary_router(context: Any) -> APIRouter:
             proposal_id,
             run_id=run_id,
         )
+
+    @router.get("/api/v2/action-proposals/{proposal_id}/feedback-summary")
+    def action_proposal_feedback(
+        proposal_id: str,
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return action_proposal_feedback_summary(
+            context,
+            proposal_id,
+            run_id=run_id,
+        )
+
+    @router.get("/api/v2/legacy-adapters")
+    def legacy_adapters() -> Dict[str, Any]:
+        return legacy_adapter_catalog()
+
+    @router.post("/api/v2/legacy-adapters/{adapter_id}/ingest")
+    def ingest_legacy_adapter_row(
+        adapter_id: str,
+        row: Dict[str, Any] = Body(default_factory=dict),
+    ) -> Dict[str, Any]:
+        payload = legacy_adapter_payload(adapter_id, row)
+        result = ingest_source_record_payload(context, payload)
+        result["adapter_id"] = adapter_id
+        result["adapted_payload"] = payload
+        return result
 
     @router.post("/api/v2/source-key-mappings")
     def upsert_source_key_mapping(

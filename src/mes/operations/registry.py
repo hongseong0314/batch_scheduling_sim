@@ -111,6 +111,30 @@ class OperationRegistry:
             "equipment": equipment,
         }
 
+    def route_graph_payload(self) -> Dict[str, Any]:
+        nodes = [self._operations[key].to_dict() for key in self._operation_order]
+        edges = []
+        for operation in nodes:
+            source = operation["operation_id"]
+            for target in operation.get("downstream_operation_ids", []) or []:
+                edges.append(
+                    {"from_operation_id": source, "to_operation_id": str(target)}
+                )
+        equipment_by_operation = {
+            operation_id: [
+                equipment.to_dict()
+                for equipment in self.equipment_for_operation(operation_id)
+            ]
+            for operation_id in self._operation_order
+        }
+        return {
+            "operation_count": len(nodes),
+            "equipment_count": len(self._equipment_order),
+            "nodes": nodes,
+            "edges": edges,
+            "equipment_by_operation": equipment_by_operation,
+        }
+
 
 def build_default_operation_registry(config: Mapping[str, Any] | None = None) -> OperationRegistry:
     resolved = dict(config or {})

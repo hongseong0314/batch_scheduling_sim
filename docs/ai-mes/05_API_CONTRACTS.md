@@ -55,10 +55,14 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/fab/live` | Live control-room state |
 | `GET /api/v2/runs` | Current and historical local simulator run/session index |
 | `GET /api/v2/operations` | Operation and equipment registry for simulator and future production process mapping |
+| `GET /api/v2/operations/route-graph` | Operation route graph with downstream edges and capable equipment |
+| `GET /api/v2/production-readiness` | Deployment-boundary readiness and persistence diagnostics |
 | `GET /api/v2/action-proposals` | Legacy-safe action proposals derived from validated MES commands |
 | `GET /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Legacy MES accept/modify/reject decision records for one proposal |
 | `GET /api/v2/action-proposals/{proposal_id}/outcomes` | Execution/quality outcome records for one proposal |
 | `GET /api/v2/action-proposals/{proposal_id}/lifecycle` | Combined lifecycle summary, legacy decisions, and outcomes for one proposal |
+| `GET /api/v2/action-proposals/{proposal_id}/feedback-summary` | Proposed-vs-actual feedback summary for policy evaluation |
+| `GET /api/v2/legacy-adapters` | Source-specific row adapter catalog |
 | `GET /api/v2/source-key-mappings` | Legacy source-system key to canonical AI MES id mappings |
 | `GET /api/v2/source-key-mappings/resolve` | Resolve one source-system key to a canonical AI MES id |
 | `GET /api/v2/ingestion/source-records` | Raw legacy source rows/events preserved as ingestion evidence |
@@ -94,10 +98,13 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/simulation/autoplay/status` | Poll autoplay and optionally step |
 | `POST /api/v2/process-tools/{tool_id}/run` | Read-only process model inference with structured input |
 | `POST /api/v2/process-chat` | Process-engineer chat over read-only process tools with LLM/fallback mode |
+| `POST /api/v2/legacy-adapters/{adapter_id}/ingest` | Adapt one source-specific row and ingest it through the canonical contract |
 | `POST /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Record the legacy MES decision for an AI proposal |
 | `POST /api/v2/action-proposals/{proposal_id}/outcomes` | Record actual execution/quality evidence for an AI proposal |
 | `POST /api/v2/source-key-mappings` | Upsert one legacy source-key mapping |
 | `POST /api/v2/ingestion/source-records` | Store one raw source record and optional canonical projection |
+| `POST /api/v2/digital-twin/recommendation-run` | Run L4/L3/L1/L2/Rule Engine against canonical twin state and return an ActionProposal |
+| `POST /api/v2/ai-dev/scenarios/capture-canonical` | Capture a canonical twin scenario for policy experiments |
 
 ## Current V2 Payload Summary
 

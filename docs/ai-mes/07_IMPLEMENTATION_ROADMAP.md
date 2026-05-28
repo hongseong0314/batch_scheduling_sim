@@ -397,20 +397,23 @@ Future deliverables:
 
 Recommended next build order:
 
-1. Full recommendation/action-proposal preview from `CANONICAL_TWIN` state.
-2. Source-specific adapters that map MES/FDC/RMS/ERP rows into the generic
-   ingestion contract.
-3. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
+1. Source adapter scheduling/backfill jobs for MES/FDC/RMS/ERP ingestion.
+2. Production PostgreSQL schema and migrations for canonical/event/proposal
+   records.
+3. Auth, roles, and operator approval queue for write-capable workflows.
+4. Full source-data quality dashboard for duplicate, late, missing, and
+   conflicting events.
+5. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
    packing quality.
-4. Add approval-gated write-tool contract for future L4/operator workflows,
+6. Add approval-gated write-tool contract for future L4/operator workflows,
    keeping current `/mes#chat` default read-only.
-5. Scenario preset library and config controls for balanced/A-bottleneck/
+7. Scenario preset library and config controls for balanced/A-bottleneck/
    B-bottleneck/stress experiments.
-6. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
-7. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
-8. Richer FeatureSnapshot and state diff indexing for every decision cycle.
-9. Quality/rework lineage records linked to task, recipe/APC, and equipment.
-10. Recipe/APC command endpoints and operator hold/release/approval workflows.
+8. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
+9. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
+10. Richer FeatureSnapshot and state diff indexing for every decision cycle.
+11. Quality/rework lineage records linked to task, recipe/APC, and equipment.
+12. Recipe/APC command endpoints and operator hold/release/approval workflows.
 
 ## Phase 9: Operator Workflow And Production Boundaries
 

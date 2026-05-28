@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from src.mes.action_proposals import LegacyDecision, OutcomeRecord
 from src.mes.adapters import wafer_id_from_task_uid
 from src.mes.domain import (
     AIRecommendation,
@@ -20,8 +21,10 @@ from src.mes.domain import (
     MESCommand,
     Recipe,
     RuleValidationResult,
+    SourceKeyMapping,
     Wafer,
 )
+from src.mes.ingestion import CanonicalIngestionRecord, RawSourceRecord
 from src.mes.recommendations import make_id
 
 
@@ -48,6 +51,10 @@ class InMemoryMESStore:
         "event_ledger_index",
         "state_snapshot_index",
         "genealogy_edge_index",
+        "source_key_mapping_index",
+        "proposal_lifecycle_index",
+        "raw_source_record_index",
+        "canonical_ingestion_index",
     )
 
     def __init__(self):
@@ -57,6 +64,11 @@ class InMemoryMESStore:
         self._wafers: Dict[str, Wafer] = {}
         self._equipment: Dict[str, Equipment] = {}
         self._recipes: Dict[str, Recipe] = {}
+        self._source_key_mappings: Dict[str, SourceKeyMapping] = {}
+        self._legacy_decisions: Dict[str, LegacyDecision] = {}
+        self._outcome_records: Dict[str, OutcomeRecord] = {}
+        self._raw_source_records: Dict[str, RawSourceRecord] = {}
+        self._canonical_ingestion_records: Dict[str, CanonicalIngestionRecord] = {}
         self._feature_snapshots: Dict[str, FeatureSnapshot] = {}
         self._recommendations: Dict[str, AIRecommendation] = {}
         self._validations: List[RuleValidationResult] = []
@@ -116,6 +128,15 @@ class InMemoryMESStore:
             "event_ledger_index": len(self.events(run_id=run_id)),
             "state_snapshot_index": len(self.feature_snapshots(run_id=run_id)),
             "genealogy_edge_index": 0,
+            "source_key_mapping_index": len(self.source_key_mappings(run_id=run_id)),
+            "proposal_lifecycle_index": (
+                len(self.legacy_decisions(run_id=run_id))
+                + len(self.outcome_records(run_id=run_id))
+            ),
+            "raw_source_record_index": len(self.raw_source_records(run_id=run_id)),
+            "canonical_ingestion_index": len(
+                self.canonical_ingestion_records(run_id=run_id)
+            ),
         }
 
     def normalized_index_rows(
@@ -160,6 +181,83 @@ class InMemoryMESStore:
                     "payload": event.to_dict(),
                 }
                 for event in self.events(run_id=run_id)[-limit:]
+            ]
+        if name == "source_key_mapping_index":
+            return [mapping.to_dict() for mapping in self.source_key_mappings(run_id=run_id)[-limit:]]
+        if name == "proposal_lifecycle_index":
+            rows = []
+            for decision in self.legacy_decisions(run_id=run_id):
+                payload = decision.to_dict()
+                rows.append(
+                    {
+                        "run_id": decision.run_id,
+                        "proposal_id": decision.proposal_id,
+                        "record_type": "LEGACY_DECISION",
+                        "record_id": decision.decision_id,
+                        "correlation_id": decision.correlation_id,
+                        "status": decision.legacy_status,
+                        "event_time": decision.decision_time,
+                        "payload": payload,
+                    }
+                )
+            for outcome in self.outcome_records(run_id=run_id):
+                payload = outcome.to_dict()
+                rows.append(
+                    {
+                        "run_id": outcome.run_id,
+                        "proposal_id": outcome.proposal_id,
+                        "record_type": "OUTCOME",
+                        "record_id": outcome.outcome_id,
+                        "correlation_id": outcome.correlation_id,
+                        "status": outcome.outcome_status,
+                        "event_time": outcome.event_time,
+                        "payload": payload,
+                    }
+                )
+            return rows[-limit:]
+        if name == "raw_source_record_index":
+            return [
+                {
+                    "run_id": record.run_id,
+                    "record_id": record.record_id,
+                    "source_system": record.source_system,
+                    "source_table": record.source_table,
+                    "source_pk": record.source_pk,
+                    "source_key": record.source_key,
+                    "entity_type": record.entity_type,
+                    "operation_id": record.operation_id,
+                    "equipment_id": record.equipment_id,
+                    "lot_id": record.lot_id,
+                    "unit_id": record.unit_id,
+                    "recipe_id": record.recipe_id,
+                    "status": record.status,
+                    "event_time": record.event_time,
+                    "ingest_time": record.ingest_time,
+                    "decision_time": record.decision_time,
+                    "payload": record.to_dict(),
+                }
+                for record in self.raw_source_records(run_id=run_id)[-limit:]
+            ]
+        if name == "canonical_ingestion_index":
+            return [
+                {
+                    "run_id": record.run_id,
+                    "record_id": record.record_id,
+                    "raw_record_id": record.raw_record_id,
+                    "entity_type": record.entity_type,
+                    "canonical_id": record.canonical_id,
+                    "operation_id": record.operation_id,
+                    "equipment_id": record.equipment_id,
+                    "lot_id": record.lot_id,
+                    "unit_id": record.unit_id,
+                    "recipe_id": record.recipe_id,
+                    "event_type": record.event_type,
+                    "event_time": record.event_time,
+                    "ingest_time": record.ingest_time,
+                    "decision_time": record.decision_time,
+                    "payload": record.to_dict(),
+                }
+                for record in self.canonical_ingestion_records(run_id=run_id)[-limit:]
             ]
         return []
 
@@ -228,6 +326,167 @@ class InMemoryMESStore:
     def upsert_recipe(self, recipe: Recipe) -> None:
         self._recipes[recipe.recipe_id] = recipe
 
+    def upsert_source_key_mapping(self, mapping: SourceKeyMapping) -> None:
+        self._ensure_run_id(mapping)
+        self._source_key_mappings[mapping.mapping_id] = mapping
+
+    def add_legacy_decision(self, decision: LegacyDecision) -> None:
+        self._ensure_run_id(decision)
+        if not decision.decision_id:
+            decision.decision_id = make_id("LDEC")
+        self._legacy_decisions[decision.decision_id] = decision
+
+    def add_outcome_record(self, outcome: OutcomeRecord) -> None:
+        self._ensure_run_id(outcome)
+        if not outcome.outcome_id:
+            outcome.outcome_id = make_id("OUT")
+        self._outcome_records[outcome.outcome_id] = outcome
+
+    def add_raw_source_record(self, record: RawSourceRecord) -> None:
+        self._ensure_run_id(record)
+        self._raw_source_records[record.record_id] = record
+
+    def add_canonical_ingestion_record(self, record: CanonicalIngestionRecord) -> None:
+        self._ensure_run_id(record)
+        self._canonical_ingestion_records[record.record_id] = record
+
+    def source_key_mappings(
+        self,
+        source_system: Optional[str] = None,
+        entity_type: Optional[str] = None,
+        canonical_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[SourceKeyMapping]:
+        mappings = list(self._source_key_mappings.values())
+        if source_system is not None:
+            mappings = [
+                mapping for mapping in mappings if mapping.source_system == source_system
+            ]
+        if entity_type is not None:
+            mappings = [
+                mapping for mapping in mappings if mapping.entity_type == entity_type
+            ]
+        if canonical_id is not None:
+            mappings = [
+                mapping for mapping in mappings if mapping.canonical_id == canonical_id
+            ]
+        if run_id is not None:
+            mappings = [mapping for mapping in mappings if mapping.run_id == run_id]
+        return mappings
+
+    def resolve_source_key_mapping(
+        self,
+        source_system: str,
+        source_table: str,
+        source_pk: str,
+        entity_type: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> Optional[SourceKeyMapping]:
+        matches = [
+            mapping
+            for mapping in self._source_key_mappings.values()
+            if mapping.source_system == source_system
+            and mapping.source_table == source_table
+            and mapping.source_pk == source_pk
+            and mapping.status == "ACTIVE"
+        ]
+        if entity_type is not None:
+            matches = [mapping for mapping in matches if mapping.entity_type == entity_type]
+        if run_id is not None:
+            matches = [mapping for mapping in matches if mapping.run_id == run_id]
+        return matches[-1] if matches else None
+
+    def legacy_decisions(
+        self,
+        proposal_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[LegacyDecision]:
+        decisions = list(self._legacy_decisions.values())
+        if proposal_id is not None:
+            decisions = [
+                decision for decision in decisions if decision.proposal_id == proposal_id
+            ]
+        if correlation_id is not None:
+            decisions = [
+                decision
+                for decision in decisions
+                if decision.correlation_id == correlation_id
+            ]
+        if run_id is not None:
+            decisions = [decision for decision in decisions if decision.run_id == run_id]
+        return decisions
+
+    def outcome_records(
+        self,
+        proposal_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[OutcomeRecord]:
+        outcomes = list(self._outcome_records.values())
+        if proposal_id is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.proposal_id == proposal_id]
+        if correlation_id is not None:
+            outcomes = [
+                outcome
+                for outcome in outcomes
+                if outcome.correlation_id == correlation_id
+            ]
+        if run_id is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.run_id == run_id]
+        return outcomes
+
+    def raw_source_records(
+        self,
+        source_system: Optional[str] = None,
+        entity_type: Optional[str] = None,
+        record_id: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_pk: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[RawSourceRecord]:
+        records = list(self._raw_source_records.values())
+        if source_system is not None:
+            records = [
+                record for record in records if record.source_system == source_system
+            ]
+        if entity_type is not None:
+            records = [record for record in records if record.entity_type == entity_type]
+        if record_id is not None:
+            records = [record for record in records if record.record_id == record_id]
+        if source_table is not None:
+            records = [record for record in records if record.source_table == source_table]
+        if source_pk is not None:
+            records = [record for record in records if record.source_pk == source_pk]
+        if run_id is not None:
+            records = [record for record in records if record.run_id == run_id]
+        return records
+
+    def canonical_ingestion_records(
+        self,
+        entity_type: Optional[str] = None,
+        canonical_id: Optional[str] = None,
+        raw_record_id: Optional[str] = None,
+        record_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[CanonicalIngestionRecord]:
+        records = list(self._canonical_ingestion_records.values())
+        if entity_type is not None:
+            records = [record for record in records if record.entity_type == entity_type]
+        if canonical_id is not None:
+            records = [
+                record for record in records if record.canonical_id == canonical_id
+            ]
+        if raw_record_id is not None:
+            records = [
+                record for record in records if record.raw_record_id == raw_record_id
+            ]
+        if record_id is not None:
+            records = [record for record in records if record.record_id == record_id]
+        if run_id is not None:
+            records = [record for record in records if record.run_id == run_id]
+        return records
+
     def sync_runtime_state(
         self,
         mes_state: Dict[str, Any],
@@ -258,6 +517,11 @@ class InMemoryMESStore:
         self._validations.clear()
         self._commands.clear()
         self._events.clear()
+        self._source_key_mappings.clear()
+        self._legacy_decisions.clear()
+        self._outcome_records.clear()
+        self._raw_source_records.clear()
+        self._canonical_ingestion_records.clear()
 
     def lots(self) -> List[Lot]:
         return list(self._lots.values())

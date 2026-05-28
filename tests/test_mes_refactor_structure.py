@@ -23,8 +23,9 @@ def test_mes_api_is_route_wiring_only() -> None:
     for helper in moved_helpers:
         assert helper not in source
 
-    assert source.count("@app.") >= 20
-    assert len(source.splitlines()) < 450
+    assert "@app." not in source
+    assert source.count("app.include_router") >= 8
+    assert len(source.splitlines()) < 80
 
 
 def test_control_room_ui_assets_are_separate_files() -> None:
@@ -54,6 +55,13 @@ def test_harness_and_service_facades_delegate_to_feature_modules() -> None:
         MES_ROOT / "decision" / "candidates.py",
         MES_ROOT / "decision" / "annotations.py",
         MES_ROOT / "decision" / "simulator_actions.py",
+        MES_ROOT / "runtime" / "app_shell_api.py",
+        MES_ROOT / "runtime" / "v1_api.py",
+        MES_ROOT / "runtime" / "control_api.py",
+        MES_ROOT / "runtime" / "trace_api.py",
+        MES_ROOT / "runtime" / "ai_dev_api.py",
+        MES_ROOT / "runtime" / "production_boundary_api.py",
+        MES_ROOT / "runtime" / "run_ledger_api.py",
     ]
     for path in expected_modules:
         assert path.exists()
@@ -68,3 +76,22 @@ def test_harness_and_service_facades_delegate_to_feature_modules() -> None:
     assert "def simulator_actions_from_validation" not in service_source
     assert len(harness_source.splitlines()) < 160
     assert len(service_source.splitlines()) < 120
+
+
+def test_sqlite_store_delegates_to_persistence_modules() -> None:
+    expected_modules = [
+        MES_ROOT / "persistence" / "sqlite_schema.py",
+        MES_ROOT / "persistence" / "sqlite_records.py",
+        MES_ROOT / "persistence" / "sqlite_ledger_index.py",
+    ]
+    for path in expected_modules:
+        assert path.exists()
+
+    source = (MES_ROOT / "sqlite_store.py").read_text()
+    assert "class SQLiteSchemaMixin" not in source
+    assert "class SQLiteRecordMixin" not in source
+    assert "class SQLiteLedgerIndexMixin" not in source
+    assert "CREATE TABLE IF NOT EXISTS task_index" not in source
+    assert "def _index_command" not in source
+    assert "def _rows" not in source
+    assert len(source.splitlines()) < 260

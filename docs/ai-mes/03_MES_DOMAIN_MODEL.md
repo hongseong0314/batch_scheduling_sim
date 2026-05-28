@@ -1,7 +1,7 @@
 # MES Domain Model
 
 Status: canonical  
-Last updated: 2026-05-10
+Last updated: 2026-05-24
 
 ## Purpose
 
@@ -119,6 +119,128 @@ Status mapping:
 Health state includes A `u/m_age`, B `v/b_age`, C `finish_time`, and other
 machine snapshot fields.
 
+### OperationDefinition
+
+OperationDefinition is the production-transition description of a process step.
+It lives in `src/mes/operations/registry.py` and is exposed through
+`GET /api/v2/operations`.
+
+Current default operations are still simulator stages:
+
+| Operation id | Display name | Type | Boundary |
+|---|---|---|---|
+| `A` | Process QA | `process_qa` | `SIMULATOR_STAGE` |
+| `B` | Clean QA | `clean_qa` | `SIMULATOR_STAGE` |
+| `C` | Packing | `packing` | `SIMULATOR_STAGE` |
+
+The same contract can describe future production operations such as lithography,
+etch, deposition, metrology, or packaging steps. The key fields are
+`operation_id`, upstream/downstream ids, queue keys, equipment group,
+batch/process defaults, policy keys, and `legacy_submission_mode`.
+
+### EquipmentDefinition
+
+EquipmentDefinition is the registry metadata for a capable tool. It is separate
+from live Equipment state. The registry says what a tool is capable of; the
+runtime Equipment DTO says what it is doing now.
+
+Important fields:
+
+- `equipment_id`
+- `display_name`
+- `equipment_group_id`
+- `capable_operations`
+- `batch_size`
+- `execution_boundary`
+- `metadata`
+
+### SourceKeyMapping
+
+SourceKeyMapping connects a legacy source-system key to a canonical AI MES id.
+It is the first contract required for real MES/FDC/RMS/APC/ERP ingestion.
+
+Current fields:
+
+- `mapping_id`
+- `source_system`
+- `source_table`
+- `source_pk`
+- `source_key`
+- `entity_type`
+- `canonical_id`
+- `canonical_namespace`
+- `run_id`
+- `ingest_time`
+- `event_time`
+- `decision_time`
+- `status`
+- `confidence`
+- `source_payload`
+- `metadata`
+
+The important time boundary is:
+
+```text
+event_time != ingest_time != decision_time
+```
+
+Legacy adapters should preserve all three where available. The AI policy stack
+should consume canonical ids and decision-time state, not raw source keys.
+
+### RawSourceRecord
+
+RawSourceRecord preserves the original row/event received from MES, RMS, FDC,
+APC, ERP, or engineering data sources. It is audit evidence, not policy input.
+
+Current fields:
+
+- `record_id`
+- `source_system`
+- `source_table`
+- `source_pk`
+- `source_key`
+- `entity_type`
+- `operation_id`
+- `equipment_id`
+- `lot_id`
+- `unit_id`
+- `recipe_id`
+- `event_time`
+- `ingest_time`
+- `decision_time`
+- `status`
+- `payload`
+- `metadata`
+- `run_id`
+
+### CanonicalIngestionRecord
+
+CanonicalIngestionRecord is the normalized projection created from a
+RawSourceRecord. This is the shape future WIP reconstruction, genealogy,
+KPI evaluation, and policy training should consume.
+
+Current fields:
+
+- `record_id`
+- `raw_record_id`
+- `entity_type`
+- `canonical_id`
+- `canonical_namespace`
+- `operation_id`
+- `equipment_id`
+- `lot_id`
+- `unit_id`
+- `recipe_id`
+- `event_type`
+- `event_time`
+- `ingest_time`
+- `decision_time`
+- `attributes`
+- `measurements`
+- `quality_result`
+- `payload`
+- `run_id`
+
 ### Recipe
 
 Recipe is the process-control master and runtime selection record.
@@ -218,6 +340,92 @@ Current fields:
 
 The command may contain a simulator action payload after validation.
 
+### ActionProposal
+
+ActionProposal is the production-facing projection of a validated MESCommand.
+It lives in `src/mes/action_proposals.py`.
+
+In the simulator path, a command can still be executed against `env.step()`. In
+the production path, the AI layer must treat that same intent as a proposal to a
+legacy MES boundary.
+
+Current fields:
+
+- `proposal_id`
+- `proposal_type`
+- `correlation_id`
+- `operation_id`
+- `source_command_id`
+- `source_command_type`
+- `validation_status`
+- `status`
+- `candidate_id`
+- `target_equipment_id`
+- `target_equipment_group_id`
+- `target_unit_ids`
+- `target_lot_ids`
+- `policy_refs`
+- `legacy_submission_mode`
+- `direct_equipment_control`
+- `payload`
+- `run_id`
+
+The invariant is:
+
+```python
+direct_equipment_control = False
+```
+
+Future production adapters may submit the proposal to a legacy outbox,
+approval queue, or integration API, but the AI MES should not bypass the
+legacy execution authority.
+
+### LegacyDecision
+
+LegacyDecision records how the legacy MES responded to an ActionProposal.
+
+Current fields:
+
+- `decision_id`
+- `proposal_id`
+- `legacy_status`
+- `correlation_id`
+- `legacy_assignment_id`
+- `actual_equipment_id`
+- `actual_unit_ids`
+- `reason`
+- `decision_time`
+- `decided_by`
+- `payload`
+- `run_id`
+
+Typical `legacy_status` values are `SUBMITTED`, `ACCEPTED`, `MODIFIED`,
+`REJECTED`, and `EXPIRED`. The current implementation does not enforce the enum
+because production systems often introduce site-specific intermediate states.
+
+### OutcomeRecord
+
+OutcomeRecord records what actually happened after the legacy MES decision.
+
+Current fields:
+
+- `outcome_id`
+- `proposal_id`
+- `outcome_status`
+- `correlation_id`
+- `actual_equipment_id`
+- `actual_unit_ids`
+- `event_time`
+- `quality_result`
+- `cycle_time`
+- `rework_count`
+- `payload`
+- `run_id`
+
+Typical `outcome_status` values are `EXECUTED`, `FAILED`, `CANCELLED`,
+`QUALITY_PASS`, and `QUALITY_FAIL`. These records are the bridge from safe AI
+recommendations to policy evaluation and future learning datasets.
+
 ### Genealogy
 
 Genealogy is defined but not fully populated yet. It should connect:
@@ -242,9 +450,22 @@ Product -> Lot -> Wafer -> Operation -> Equipment -> Recipe -> QA result
 - validations,
 - commands,
 - events.
+- source-key mappings,
+- legacy decisions,
+- outcome records.
 
 `SQLiteMESStore` persists these records as JSON payloads in local SQLite tables
 and maintains a run-scoped normalized index for developer genealogy queries.
+The public store class remains `src/mes/sqlite_store.py`; focused persistence
+helpers live under `src/mes/persistence/`:
+
+- `sqlite_schema.py`: schema version, JSON audit tables, and normalized ledger
+  DDL,
+- `sqlite_records.py`: JSON payload insert/upsert/reload and normalized index
+  reads,
+- `sqlite_ledger_index.py`: command, event, task, lot, equipment timeline, and
+  genealogy edge indexing.
+
 The normalized index is intentionally narrow and append-oriented:
 
 - `run_index`,
@@ -255,7 +476,9 @@ The normalized index is intentionally narrow and append-oriented:
 - `command_ledger_index`,
 - `event_ledger_index`,
 - `state_snapshot_index`,
-- `genealogy_edge_index`.
+- `genealogy_edge_index`,
+- `source_key_mapping_index`,
+- `proposal_lifecycle_index`.
 
 Reset starts a new `run_id` and clears only the live simulator/runtime cache.
 Historical command, event, task, lot, equipment, and state snapshot evidence
@@ -275,6 +498,8 @@ The production-style repository should normalize at least:
 - rule validations,
 - commands,
 - events,
+- source-key mappings,
+- proposal lifecycle decisions/outcomes,
 - genealogy,
 - reservations/locks,
 - operator approvals.
@@ -291,7 +516,7 @@ genealogy from events.
 | simulator task/machine snapshots | `ManufacturingEnv.get_decision_state()` |
 | MES DTO conversion | `SimulatorMESAdapter` |
 | runtime entity persistence | `InMemoryMESStore` / `SQLiteMESStore` |
-| audit persistence | store classes |
+| audit persistence | `SQLiteMESStore` plus `src/mes/persistence/*` helpers |
 | final command validation | `MESRuleEngine` |
 | API route wiring | `src/mes/api.py` |
 | runtime payloads | `src/mes/runtime/*` |

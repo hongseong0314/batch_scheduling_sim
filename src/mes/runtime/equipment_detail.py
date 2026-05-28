@@ -14,6 +14,7 @@ from src.mes.runtime.common import (
     task_code,
     task_rows_for_uids,
 )
+from src.mes.runtime.naming import equipment_display_name, stage_display_name
 
 
 def recipe_label(stage: str, recipe: List[Any]) -> str:
@@ -332,7 +333,9 @@ def equipment_detail(context: Any, equipment_id: str) -> Dict[str, Any]:
         return {
             "time": decision_state.get("time", 0),
             "equipment_id": canonical_id,
+            "display_name": equipment_display_name(context, canonical_id),
             "stage": stage,
+            "stage_label": stage_display_name(context, stage),
             "process_label": "Packing / Material Compatibility",
             "status": str(machine_state.get("status", "UNKNOWN")).upper(),
             "batch_size": machine_state.get("batch_size"),
@@ -372,7 +375,9 @@ def equipment_detail(context: Any, equipment_id: str) -> Dict[str, Any]:
     return {
         "time": decision_state.get("time", 0),
         "equipment_id": canonical_id,
+        "display_name": equipment_display_name(context, canonical_id),
         "stage": stage,
+        "stage_label": stage_display_name(context, stage),
         "process_label": process_label,
         "status": str(machine_state.get("status", "UNKNOWN")).upper(),
         "batch_size": machine_state.get("batch_size"),

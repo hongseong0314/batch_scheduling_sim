@@ -1,7 +1,7 @@
 # Implementation Roadmap
 
 Status: canonical  
-Last updated: 2026-05-15
+Last updated: 2026-05-25
 
 ## Guiding Principle
 
@@ -98,6 +98,8 @@ Deliverables:
 - planner/generator/evaluator moved to `src/mes/harnessing/`,
 - `src/mes/services.py` reduced to a facade over `src/mes/decision/`,
 - `src/mes/api.py` reduced to FastAPI route wiring,
+- feature-specific FastAPI route declarations split into focused
+  `src/mes/runtime/*_api.py` router modules,
 - runtime payload builders moved to `src/mes/runtime/`,
 - control-room UI moved to `src/mes/ui/templates` and `src/mes/ui/static`,
 - evaluator checks for portfolio and layer consistency,
@@ -225,7 +227,13 @@ Deliverables:
 - reset that preserves prior genealogy under prior run ids,
 - normalized SQLite index tables for runs, tasks, lots, assignments,
   equipment timeline, commands, events, state snapshots, and genealogy edges,
-- direct `/api/v2/ledger-index/{index_name}` developer index query API.
+- SQLite persistence internals split into `src/mes/persistence/sqlite_schema.py`,
+  `sqlite_records.py`, and `sqlite_ledger_index.py` while preserving the
+  `SQLiteMESStore` public API,
+- direct `/api/v2/ledger-index/{index_name}` developer index query API,
+- SQLite-backed Agent Run records for `/mes#chat` and Agent Run Inspector,
+- configurable process/equipment display names while preserving canonical
+  simulator ids.
 
 Acceptance:
 
@@ -247,18 +255,165 @@ Future deliverables:
 - explicit quality/rework lineage records,
 - durable genealogy queries across process restarts.
 
+## Phase 8.5: Operation Registry And Action Proposal Boundary
+
+Status: implemented for V1 production-transition contracts.
+
+Deliverables:
+
+- operation/equipment registry in `src/mes/operations/registry.py`,
+- default A/B/C simulator operations registered from runtime config,
+- configurable operation insertion path for future production process steps,
+- registry-backed stage/equipment display naming,
+- external runtime config in `config/mes-runtime.yaml` and
+  `MES_RUNTIME_CONFIG`,
+- `GET /api/v2/operations` registry API,
+- Action Proposal DTOs in `src/mes/action_proposals.py`,
+- `GET /api/v2/action-proposals` API derived from validated commands,
+- explicit `direct_equipment_control=false` production boundary,
+- proposal lifecycle DTOs for legacy decisions and execution outcomes,
+- in-memory and SQLite persistence for proposal lifecycle records,
+- `proposal_lifecycle_index` normalized ledger table,
+- `POST/GET /api/v2/action-proposals/{proposal_id}/legacy-decisions`,
+- `POST/GET /api/v2/action-proposals/{proposal_id}/outcomes`,
+- `GET /api/v2/action-proposals/{proposal_id}/lifecycle`.
+
+Acceptance:
+
+- A/B/C remain compatible with simulator state/action keys,
+- real operations can be represented without changing environment physics,
+- AI-generated commands can be projected as legacy-safe proposals,
+- proposal records link back to correlation id, candidate id, command id, target
+  equipment, target units, and L1/L2 recommendation ids,
+- legacy accept/modify/reject decisions and execution outcomes can be linked
+  back to the `proposal_id`,
+- `/api/v2/action-proposals` includes lifecycle summary fields for each proposal.
+
+Future deliverables:
+
+- production outbox adapter and operator approval queue,
+- operation registry loading from route/equipment master data.
+
+## Phase 8.6: Legacy Source Key Mapping
+
+Status: implemented for V1 mapping contracts.
+
+Deliverables:
+
+- `SourceKeyMapping` DTO in `src/mes/domain.py`,
+- in-memory and SQLite store support for source-key mappings,
+- `source_key_mapping_index` normalized ledger table,
+- deterministic `SKM_...` mapping ids from source system/table/pk/entity/run,
+- `POST /api/v2/source-key-mappings` upsert API,
+- `GET /api/v2/source-key-mappings` list API,
+- `GET /api/v2/source-key-mappings/resolve` lookup API,
+- canonical documentation in `11_LEGACY_SOURCE_KEY_MAPPING.md`.
+
+Acceptance:
+
+- a legacy source key can be resolved to a canonical AI MES id,
+- mapping records preserve `event_time`, `ingest_time`, and `decision_time`,
+- mappings persist through SQLite reload,
+- `/api/v2/ledger-index/source_key_mapping_index` exposes mapping evidence.
+
+Follow-on deliverables:
+
+- canonical ingestion records are handled by Phase 8C below,
+- source-specific ingestion adapters,
+- conflict review for one source key mapping to multiple canonical ids,
+- production PostgreSQL DDL and migration scripts,
+- source-system data quality diagnostics.
+
+## Phase 8C: Legacy Ingestion Contract V1
+
+Deliverables:
+
+- `RawSourceRecord` DTO in `src/mes/ingestion.py`,
+- `CanonicalIngestionRecord` DTO in `src/mes/ingestion.py`,
+- in-memory and SQLite store support for both ingestion record types,
+- `raw_source_record_index` and `canonical_ingestion_index` normalized ledger
+  tables,
+- `POST /api/v2/ingestion/source-records` ingest API,
+- `GET /api/v2/ingestion/source-records` list API,
+- `GET /api/v2/ingestion/canonical-records` list API,
+- automatic SourceKeyMapping upsert when `canonical_id` is present,
+- canonical documentation in `13_LEGACY_INGESTION_CONTRACT.md`.
+
+Acceptance:
+
+- raw source evidence persists through SQLite reload,
+- canonical projections persist through SQLite reload,
+- ingestion preserves `event_time`, `ingest_time`, and `decision_time`,
+- source-key mapping resolve works after ingestion with a canonical id,
+- raw-only records can be stored before a mapping is available.
+
+Future deliverables:
+
+- source-specific MES/FDC/RMS/ERP ingestion adapters,
+- event-sourced WIP reconstruction from canonical ingestion records,
+- conflict review workflow for mapping collisions,
+- production PostgreSQL DDL and migration scripts,
+- source-system data quality diagnostics.
+
+## Phase 8D: Production Digital Twin Backbone V1
+
+Status: implemented for canonical replay and L1 candidate preview.
+
+Deliverables:
+
+- event-sourced replay helper in `src/mes/digital_twin.py`,
+- runtime payload helpers in `src/mes/runtime/digital_twin.py`,
+- API routes:
+  - `GET /api/v2/digital-twin/canonical-state`,
+  - `GET /api/v2/digital-twin/canonical-decision-state`,
+  - `GET /api/v2/digital-twin/candidate-preview`,
+- supported canonical event semantics for wait/running/rework/hold/completed
+  unit state and equipment availability,
+- production `CANONICAL_TWIN` state source marker,
+- policy-compatible decision-state builder,
+- L1 candidate portfolio preview from canonical state,
+- canonical documentation in `14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md`.
+
+Acceptance:
+
+- canonical unit/equipment records replay into operation WIP state,
+- event-time cutoff changes reconstructed state,
+- rework events move units into `rework_pool_uids`,
+- policy-ready state has the same `tasks`, stage queues, and machine shape as
+  simulator state,
+- candidate preview generates L1 candidates from canonical state without
+  mutating simulator state.
+
+Future deliverables:
+
+- full L4 -> L3 -> L1 -> L2 -> Rule Engine -> Action Proposal preview from
+  canonical twin state,
+- source-specific adapter packages for MES/FDC/RMS/ERP event vocabularies,
+- out-of-order event conflict diagnostics,
+- production PostgreSQL event store,
+- WIP reconstruction freshness and data-quality monitoring.
+
 ## Next Priorities
 
 Recommended next build order:
 
-1. Event-sourced WIP reconstruction independent of live simulator state.
-2. Scenario preset library and config controls for balanced/A-bottleneck/
+1. Source adapter scheduling/backfill jobs for MES/FDC/RMS/ERP ingestion.
+2. Production PostgreSQL schema and migrations for canonical/event/proposal
+   records.
+3. Auth, roles, and operator approval queue for write-capable workflows.
+4. Full source-data quality dashboard for duplicate, late, missing, and
+   conflicting events.
+5. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
+   packing quality.
+6. Add approval-gated write-tool contract for future L4/operator workflows,
+   keeping current `/mes#chat` default read-only.
+7. Scenario preset library and config controls for balanced/A-bottleneck/
    B-bottleneck/stress experiments.
-3. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
-4. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
-5. Richer FeatureSnapshot and state diff indexing for every decision cycle.
-6. Quality/rework lineage records linked to task, recipe/APC, and equipment.
-7. Recipe/APC command endpoints and operator hold/release/approval workflows.
+8. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
+9. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
+10. Richer FeatureSnapshot and state diff indexing for every decision cycle.
+11. Quality/rework lineage records linked to task, recipe/APC, and equipment.
+12. Recipe/APC command endpoints and operator hold/release/approval workflows.
 
 ## Phase 9: Operator Workflow And Production Boundaries
 

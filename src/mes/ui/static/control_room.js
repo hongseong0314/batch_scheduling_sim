@@ -17,7 +17,18 @@
     let lastAssignmentTrace = null;
     let lastGenealogy = null;
     let lastRuns = null;
+    let selectedAgentRunId = null;
+    let lastAgentRunDetail = null;
     let selectedGenealogyRunId = "";
+    let chatMessages = [
+      {
+        role: "system",
+        content: "A 공정 APC 예측 질문을 입력하면 read-only process tool 결과를 기반으로 답변합니다.",
+        mode: "ready",
+        tool_calls: [],
+      }
+    ];
+    let chatModels = [];
     const AI_DEV_CYCLE_LIMIT = 25;
 
     const statusClass = (status) => {
@@ -42,6 +53,11 @@
       return `<code class="truncate-id" title="${escapeText(text)}">${escapeText(clipped)}</code>`;
     }
 
+    function truncateText(value, max = 80) {
+      const text = String(value || "");
+      return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+    }
+
     async function postJSON(url, body) {
       const res = await fetch(url, {
         method: "POST",
@@ -63,15 +79,17 @@
 
     async function loadAiDevSummary() {
       try {
-        const [policyStack, decisionCycles, policyVariants, scenarios, experiments, runs] = await Promise.all([
+        const [policyStack, decisionCycles, policyVariants, scenarios, experiments, runs, processChatModels, agentRuns] = await Promise.all([
           fetch("/api/v2/ai-dev/policy-stack").then(r => r.json()),
           fetch(`/api/v2/ai-dev/decision-cycles?limit=${AI_DEV_CYCLE_LIMIT}`).then(r => r.json()),
           fetch("/api/v2/ai-dev/policy-variants").then(r => r.json()),
           fetch("/api/v2/ai-dev/scenarios").then(r => r.json()),
           fetch("/api/v2/ai-dev/experiments").then(r => r.json()),
           fetch("/api/v2/runs").then(r => r.json()),
+          fetch("/api/v2/process-chat/models").then(r => r.json()),
+          fetch("/api/v2/agent-runs?limit=25").then(r => r.json()),
         ]);
-        return { policyStack, decisionCycles, policyVariants, scenarios, experiments, runs };
+        return { policyStack, decisionCycles, policyVariants, scenarios, experiments, runs, processChatModels, agentRuns };
       } catch (error) {
         return {
           policyStack: {},
@@ -80,8 +98,116 @@
           scenarios: { items: [] },
           experiments: { items: [] },
           runs: { items: [] },
+          processChatModels: { items: [] },
+          agentRuns: { items: [] },
         };
       }
+    }
+
+    function renderChatModels(payload) {
+      const select = document.getElementById("chat-model");
+      if (!select) return;
+      const items = payload?.items || [];
+      if (JSON.stringify(items) === JSON.stringify(chatModels)) return;
+      const previous = select.value;
+      chatModels = items;
+      select.innerHTML = items.length
+        ? items.map(model => `<option value="${escapeText(model.name)}">${escapeText(model.name)} · ${escapeText(model.provider)} · ${escapeText(model.model)}</option>`).join("")
+        : `<option value="">local fallback</option>`;
+      if (previous && items.some(model => model.name === previous)) {
+        select.value = previous;
+      }
+    }
+
+    function renderChatThread() {
+      const thread = document.getElementById("chat-thread");
+      if (!thread) return;
+      thread.innerHTML = chatMessages.map(message => {
+        const role = String(message.role || "assistant");
+        const toolCalls = message.tool_calls || [];
+        const agentTrace = message.agent_trace || [];
+        const toolHtml = toolCalls.length
+          ? `<div class="chat-tool-call">${toolCalls.map(call => {
+              return `${escapeText(call.tool_name || "-")} · ${escapeText(call.status || "executed")} · ${escapeText(call.policy || "-")}<br /><span>${escapeText(summarizeToolResult(call.result || call.error || {}))}</span>`;
+            }).join("<br />")}</div>`
+          : "";
+        const traceHtml = agentTrace.length
+          ? `<div class="chat-agent-trace">${agentTrace.map((step, index) => {
+              const label = step.type === "tool_call"
+                ? `${step.tool_name || "-"} · ${step.status || "-"}`
+                : `LLM · tools ${step.tool_call_count ?? 0}`;
+              return `<span>${index + 1}. ${escapeText(label)}</span>`;
+            }).join("")}</div>`
+          : "";
+        return `<article class="chat-message ${escapeText(role)}">
+          <strong>${escapeText(role)}${message.mode ? ` · ${escapeText(message.mode)}` : ""}</strong>
+          <p>${escapeText(message.content)}</p>
+          ${toolHtml}
+          ${traceHtml}
+        </article>`;
+      }).join("");
+      thread.scrollTop = thread.scrollHeight;
+      const count = chatMessages.filter(message => message.role === "assistant").length;
+      document.getElementById("nav-chat").textContent = count ? String(count) : "ready";
+    }
+
+    async function sendChatMessage(message) {
+      const trimmed = String(message || "").trim();
+      if (!trimmed) return;
+      chatMessages.push({ role: "user", content: trimmed, mode: "", tool_calls: [] });
+      renderChatThread();
+      const status = document.getElementById("chat-status");
+      const sendButton = document.getElementById("chat-send");
+      status.textContent = "running";
+      sendButton.disabled = true;
+      try {
+        const payload = await postJSON("/api/v2/process-chat", {
+          message: trimmed,
+          use_llm: document.getElementById("chat-use-llm").checked,
+          model_name: document.getElementById("chat-model").value || null,
+          mode: document.getElementById("chat-mode").value || "agent",
+          max_steps: Number(document.getElementById("chat-max-steps").value || 5),
+        });
+        chatMessages.push({
+          role: "assistant",
+          content: payload.answer || "No answer returned.",
+          mode: payload.mode || "-",
+          tool_calls: payload.tool_calls || [],
+          agent_trace: payload.agent_trace || [],
+        });
+        status.textContent = payload.fallback_used ? "fallback" : (payload.mode || "answered");
+      } catch (error) {
+        chatMessages.push({
+          role: "assistant",
+          content: `Chat request failed: ${error}`,
+          mode: "error",
+          tool_calls: [],
+          agent_trace: [],
+        });
+        status.textContent = "error";
+      } finally {
+        sendButton.disabled = false;
+        renderChatThread();
+      }
+    }
+
+    function summarizeToolResult(result) {
+      if (typeof result === "string") return result;
+      if (!result || typeof result !== "object") return "-";
+      if (result.predicted_qa !== undefined) {
+        return `predicted_qa ${result.predicted_qa} · risk ${result.quality_risk || "-"}`;
+      }
+      if (result.time !== undefined && result.stages) {
+        const stages = result.stages || {};
+        return `t=${result.time} · A wait ${stages.A?.wait ?? "-"} · B wait ${stages.B?.wait ?? "-"} · C wait ${stages.C?.wait ?? "-"}`;
+      }
+      if (result.factory_name || result.l1_policy_id) {
+        return `${result.factory_name || "policy"} · ${result.l1_policy_id || "-"} / ${result.l2_policy_id || "-"} / ${result.l3_policy_id || "-"} / ${result.l4_policy_id || "-"}`;
+      }
+      if (result.correlation_id || result.count !== undefined) {
+        return `${result.correlation_id || "-"} · count ${result.count ?? "-"}`;
+      }
+      return JSON.stringify(result).slice(0, 180);
     }
 
     function render(live, gantt, aiDev = {}) {
@@ -111,8 +237,10 @@
       renderPortfolio(live.candidate_portfolio || chain.candidate_portfolio || {});
       renderAiDev(live, aiDev);
       renderRunSelector(aiDev.runs || {});
+      renderChatModels(aiDev.processChatModels || {});
       renderEvents(live.recent_events || []);
       renderGantt(gantt || {}, live);
+      renderChatThread();
       updateNavState();
     }
 
@@ -137,9 +265,13 @@
       document.getElementById("nav-eqp").textContent = String(items.length);
       document.getElementById("equipment-body").innerHTML = items.map(eq => {
         const detailEnabled = ["A", "B", "C"].includes(String(eq.stage || "").toUpperCase());
+        const equipmentLabel = eq.display_name || eq.equipment_id;
+        const equipmentTitle = eq.display_name && eq.display_name !== eq.equipment_id
+          ? `${eq.display_name} · ${eq.equipment_id}`
+          : eq.equipment_id;
         const equipmentCell = detailEnabled
-          ? `<button class="link-button machine-link" type="button" data-equipment-id="${escapeText(eq.equipment_id)}"><code>${escapeText(eq.equipment_id)}</code></button>`
-          : `<code>${escapeText(eq.equipment_id)}</code>`;
+          ? `<button class="link-button machine-link" type="button" data-equipment-id="${escapeText(eq.equipment_id)}" title="${escapeText(equipmentTitle)}"><code>${escapeText(equipmentLabel)}</code></button>`
+          : `<code title="${escapeText(equipmentTitle)}">${escapeText(equipmentLabel)}</code>`;
         return `
         <tr class="${detailEnabled ? "selectable" : ""}" data-equipment-id="${escapeText(eq.equipment_id)}">
           <td>${equipmentCell}</td><td>${eq.stage}</td>
@@ -198,8 +330,9 @@
       empty.hidden = true;
       content.hidden = false;
       document.getElementById("nav-machine").textContent = detail.equipment_id;
+      const detailName = detail.display_name || detail.equipment_id;
       document.getElementById("machine-subtitle").textContent =
-        `${detail.equipment_id} · ${detail.process_label} · ${detail.status}`;
+        `${detailName} · ${detail.process_label} · ${detail.status}`;
       document.getElementById("machine-axis").textContent =
         `${detail.apc?.quality_axis?.x || "step"} × ${detail.apc?.quality_axis?.y || "quality"}`;
       renderMachineKpis(detail);
@@ -481,12 +614,90 @@
       renderAiDevPolicyStack(policy);
       renderAiDevCycles(cycles);
       renderExperimentRunner(aiDev);
+      renderAgentRuns(aiDev.agentRuns || {});
       const fallbackPortfolio = live.candidate_portfolio || live.active_chain?.candidate_portfolio || {};
       const activePortfolio = lastAiDevPortfolio || fallbackPortfolio;
       if (!selectedAiDevCorrelation && activePortfolio.correlation_id) {
         selectedAiDevCorrelation = activePortfolio.correlation_id;
       }
       renderAiDevPortfolio(activePortfolio);
+    }
+
+    function renderAgentRuns(payload) {
+      const runs = payload.items || [];
+      if (!selectedAgentRunId && runs.length) {
+        selectedAgentRunId = runs[0].agent_run_id;
+      }
+      document.getElementById("ai-dev-agent-run-status").textContent =
+        runs.length ? `${runs.length} latest` : "No agent runs";
+      document.getElementById("ai-dev-agent-run-body").innerHTML = runs.map(run => {
+        const selected = run.agent_run_id === selectedAgentRunId;
+        const meta = run.metadata || {};
+        return `<tr class="${selected ? "portfolio-selected" : ""}">
+          <td><button class="link-button agent-run-link" type="button" data-agent-run-id="${escapeText(run.agent_run_id)}">${renderId(run.agent_run_id, 20)}</button></td>
+          <td><span class="${statusClass(run.status)}">${escapeText(run.status || "-")}</span></td>
+          <td>${escapeText(run.mode || "-")}</td>
+          <td>${escapeText(meta.model_name || "-")}</td>
+          <td>${escapeText(run.tool_count ?? 0)}</td>
+          <td>${escapeText(run.duration_ms ?? 0)} ms</td>
+          <td title="${escapeText(run.question || "")}">${escapeText(truncateText(run.question || "-", 72))}</td>
+        </tr>`;
+      }).join("") || "<tr><td colspan='7'>No agent runs yet. Ask a question in Chat.</td></tr>";
+      document.querySelectorAll(".agent-run-link").forEach(button => {
+        button.onclick = async () => {
+          await loadAgentRunDetail(button.dataset.agentRunId);
+        };
+      });
+      if (selectedAgentRunId && (!lastAgentRunDetail || lastAgentRunDetail.agent_run_id !== selectedAgentRunId)) {
+        loadAgentRunDetail(selectedAgentRunId);
+        renderAgentRunDetail(runs.find(run => run.agent_run_id === selectedAgentRunId) || {});
+      } else {
+        renderAgentRunDetail(lastAgentRunDetail || runs[0] || {});
+      }
+    }
+
+    async function loadAgentRunDetail(agentRunId) {
+      if (!agentRunId) return;
+      selectedAgentRunId = agentRunId;
+      const response = await fetch(`/api/v2/agent-runs/${encodeURIComponent(agentRunId)}`);
+      if (!response.ok) return;
+      lastAgentRunDetail = await response.json();
+      renderAgentRunDetail(lastAgentRunDetail);
+    }
+
+    function renderAgentRunDetail(run) {
+      const detail = document.getElementById("ai-dev-agent-run-detail");
+      const steps = document.getElementById("ai-dev-agent-run-steps");
+      if (!run?.agent_run_id) {
+        detail.innerHTML = "<span class='kpi-note'>No agent run selected.</span>";
+        steps.innerHTML = "<span class='kpi-note'>No step trace loaded.</span>";
+        return;
+      }
+      const meta = run.metadata || {};
+      detail.innerHTML = `
+        <dl>
+          <dt>Run</dt><dd>${renderId(run.agent_run_id, 28)}</dd>
+          <dt>Status</dt><dd><span class="${statusClass(run.status)}">${escapeText(run.status || "-")}</span></dd>
+          <dt>Model</dt><dd>${escapeText(meta.provider || "-")} · ${escapeText(meta.model_name || "-")}</dd>
+          <dt>Prompt</dt><dd>${escapeText(meta.prompt_id || "-")} · v${escapeText(meta.prompt_version || "-")}</dd>
+          <dt>Think</dt><dd>${escapeText(meta.requested_think ? "requested" : "off")}</dd>
+          <dt>Question</dt><dd>${escapeText(run.question || "-")}</dd>
+          <dt>Final answer</dt><dd>${escapeText(run.answer || "-")}</dd>
+        </dl>`;
+      const trace = run.agent_trace || [];
+      const tools = run.tool_calls || [];
+      steps.innerHTML = `
+        <dl>
+          <dt>Steps</dt><dd>${trace.map((step, index) => {
+            if (step.type === "tool_call") {
+              return `${index + 1}. ${escapeText(step.tool_name || "-")} · ${escapeText(step.status || "-")} · ${escapeText(step.policy || "-")}`;
+            }
+            return `${index + 1}. ${escapeText(step.type || "LLM")} · tools ${escapeText(step.tool_call_count ?? 0)}`;
+          }).join("<br>") || "-"}</dd>
+          <dt>Tool calls</dt><dd>${tools.map(call =>
+            `${escapeText(call.tool_name || "-")} · ${escapeText(call.status || "-")} · ${escapeText(summarizeToolResult(call.result || call.error || {}))}`
+          ).join("<br>") || "-"}</dd>
+        </dl>`;
     }
 
     function renderAiDevPolicyStack(policy) {
@@ -1066,7 +1277,8 @@
           const labelClass = row.row_type === "buffer" ? "gantt-label buffer" : "gantt-label";
           const rowName = row.label || row.machine_id;
           const rowStage = row.display_stage || row.stage;
-          return `<div class="${labelClass}"><strong>${escapeText(rowName)}</strong><span>${escapeText(rowStage)}</span></div>
+          const rowTitle = `${rowName} · ${rowStage}`;
+          return `<div class="${labelClass}" title="${escapeText(rowTitle)}"><strong>${escapeText(rowName)}</strong><span>${escapeText(rowStage)}</span></div>
             <div class="gantt-lane">${nowLine}${rowBars}</div>`;
         }).join("")}
       </div></div>`;
@@ -1213,6 +1425,7 @@
     function updateNavState() {
       const hash = location.hash || "#fab";
       document.body.classList.toggle("portfolio-page", hash === "#candidate-portfolio");
+      document.body.classList.toggle("chat-page-active", hash === "#chat");
       document.body.classList.toggle("ai-dev-page", hash === "#ai-dev");
       document.body.classList.toggle("assignment-trace-page-active", hash === "#assignment-trace");
       document.body.classList.toggle("genealogy-page-active", hash === "#genealogy");
@@ -1256,6 +1469,20 @@
       portfolioSelectedOnly = Boolean(event.target.checked);
       renderPortfolio(lastLive?.candidate_portfolio || lastLive?.active_chain?.candidate_portfolio || {});
     };
+    document.getElementById("chat-form").onsubmit = async (event) => {
+      event.preventDefault();
+      const input = document.getElementById("chat-input");
+      const message = input.value;
+      input.value = "";
+      await sendChatMessage(message);
+    };
+    document.querySelectorAll(".chat-example").forEach(button => {
+      button.onclick = () => {
+        document.getElementById("chat-input").value = button.dataset.message || "";
+        location.hash = "chat";
+        document.getElementById("chat-input").focus();
+      };
+    });
     document.getElementById("experiment-scenario").onchange = (event) => {
       selectedExperimentScenarioId = event.target.value || null;
     };

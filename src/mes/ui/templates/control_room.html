@@ -30,6 +30,7 @@
       </div>
       <div class="nav-section" data-nav-section="ai-development">
         <div class="nav-label">AI Development</div>
+        <a class="nav-item" href="#chat"><span>Chat</span><span id="nav-chat">ready</span></a>
         <a class="nav-item" href="#ai-dev"><span>AI Dev Console</span><span id="nav-ai-dev">-</span></a>
       </div>
       <div class="nav-section" data-nav-section="system-audit">
@@ -152,6 +153,49 @@
             </table>
           </div>
         </section>
+        <section class="page-shell chat-shell" id="chat-page" data-page-purpose="process-chat">
+          <div class="panel-header">
+            <div>
+              <h2>Process Chat</h2>
+              <p class="section-kicker">Natural-language APC questions with read-only process tools</p>
+            </div>
+            <span id="chat-status">ready</span>
+          </div>
+          <div class="chat-layout">
+            <div class="chat-thread" id="chat-thread" aria-live="polite"></div>
+            <aside class="chat-context">
+              <div class="panel-header compact-header"><h2>Agent Tools</h2><span>read-only</span></div>
+              <div class="point-detail">
+                <div><span>Runtime</span><strong>MES snapshot · policy · trace</strong></div>
+                <div><span>APC</span><strong>predict_process_a_apc</strong></div>
+                <div><span>Policy</span><strong>non-write tools only</strong></div>
+              </div>
+              <div class="chat-examples">
+                <button class="button compact chat-example" type="button" data-message="A 공정에서 spec_a 48~53이고 u=6, m_age=12, recipe=[10,2,1]이면 QA가 어떻게 나올까?">A APC QA</button>
+                <button class="button compact chat-example" type="button" data-message="A 공정에서 spec_a 47.5~52.5이고 u=2, m_age=5이면 추천 recipe와 품질 위험을 알려줘">A recipe</button>
+                <button class="button compact chat-example" type="button" data-message="현재 fab 상태와 active policy stack을 보고 어떤 공정이 병목인지 설명해줘">Fab state</button>
+              </div>
+            </aside>
+          </div>
+          <form class="chat-form" id="chat-form">
+            <select id="chat-model" class="button" aria-label="Chat model"></select>
+            <select id="chat-mode" class="button" aria-label="Chat mode">
+              <option value="agent">Agent</option>
+              <option value="chat">Chat</option>
+            </select>
+            <select id="chat-max-steps" class="button" aria-label="Agent max steps">
+              <option value="3">3 steps</option>
+              <option value="5" selected>5 steps</option>
+              <option value="8">8 steps</option>
+            </select>
+            <label class="toggle-control">
+              <input id="chat-use-llm" type="checkbox" checked />
+              <span>LLM</span>
+            </label>
+            <textarea id="chat-input" rows="3" placeholder="A 공정에서 spec_a 48~53이고 u=6, m_age=12, recipe=[10,2,1]이면 QA가 어떻게 나올까?"></textarea>
+            <button class="button primary" id="chat-send" type="submit">Send</button>
+          </form>
+        </section>
         <section class="page-shell ai-dev-shell" id="ai-dev-console" data-page-purpose="policy-debug">
           <div class="panel-header">
             <div>
@@ -221,6 +265,32 @@
                 </table>
               </div>
               <div class="point-detail" id="experiment-comparison-inspector"></div>
+            </div>
+            <div class="panel-lite ai-dev-wide" id="ai-dev-agent-runs">
+              <div class="panel-header compact-header">
+                <h2>Agent Run Inspector</h2>
+                <span id="ai-dev-agent-run-status">No agent runs</span>
+              </div>
+              <div class="table-wrap">
+                <table class="agent-run-table">
+                  <thead>
+                    <tr>
+                      <th>Run</th>
+                      <th>Status</th>
+                      <th>Mode</th>
+                      <th>Model</th>
+                      <th>Tools</th>
+                      <th>Duration</th>
+                      <th>Question</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ai-dev-agent-run-body"></tbody>
+                </table>
+              </div>
+              <div class="agent-run-detail-grid">
+                <div class="point-detail" id="ai-dev-agent-run-detail"></div>
+                <div class="point-detail" id="ai-dev-agent-run-steps"></div>
+              </div>
             </div>
           </div>
         </section>

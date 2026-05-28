@@ -1,24 +1,30 @@
 # API Contracts
 
 Status: canonical  
-Last updated: 2026-05-17
+Last updated: 2026-05-24
 
 ## Purpose
 
 This document defines the simulator-backed MES API surface and the target API
 contracts needed for the layered AI architecture.
 
-The current route implementation lives in `src/mes/api.py`. Route functions are
-thin and delegate runtime behavior to `src/mes/runtime/*`.
+The FastAPI app wiring lives in `src/mes/api.py`. Feature-specific route
+declarations live in small router modules under `src/mes/runtime/*_api.py` and
+delegate runtime behavior to `src/mes/runtime/*`.
 
 | Runtime concern | Module |
 |---|---|
+| app shell and health | `src/mes/runtime/app_shell_api.py` |
+| v1 compatibility routes | `src/mes/runtime/v1_api.py` |
+| v2 simulator control and live state routes | `src/mes/runtime/control_api.py` |
 | lifecycle/reset | `src/mes/runtime/context.py` |
 | run-cycle/run-until/autoplay/generate lot | `src/mes/runtime/simulation_control.py` |
 | live control-room state | `src/mes/runtime/live_state.py` |
-| decision-chain traceability | `src/mes/runtime/decision_trace.py` |
+| decision-chain and portfolio traceability routes | `src/mes/runtime/trace_api.py`, `src/mes/runtime/decision_trace.py`, `src/mes/runtime/candidate_portfolio.py` |
 | assignment and genealogy traceability | `src/mes/runtime/assignment_trace.py`, `src/mes/runtime/genealogy.py` |
-| AI developer console payloads | `src/mes/runtime/ai_dev.py` |
+| AI developer console routes | `src/mes/runtime/ai_dev_api.py`, `src/mes/runtime/ai_dev.py`, `src/mes/runtime/experiments.py` |
+| operation registry and action proposal routes | `src/mes/runtime/production_boundary_api.py`, `src/mes/runtime/operations.py`, `src/mes/operations/registry.py` |
+| run and ledger index routes | `src/mes/runtime/run_ledger_api.py`, `src/mes/runtime/run_ledger.py` |
 | equipment detail | `src/mes/runtime/equipment_detail.py` |
 | Gantt state | `src/mes/runtime/gantt.py` |
 
@@ -48,12 +54,32 @@ thin and delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/gantt` | Gantt rows, bars, stage views, and horizon |
 | `GET /api/v2/fab/live` | Live control-room state |
 | `GET /api/v2/runs` | Current and historical local simulator run/session index |
+| `GET /api/v2/operations` | Operation and equipment registry for simulator and future production process mapping |
+| `GET /api/v2/operations/route-graph` | Operation route graph with downstream edges and capable equipment |
+| `GET /api/v2/production-readiness` | Deployment-boundary readiness and persistence diagnostics |
+| `GET /api/v2/action-proposals` | Legacy-safe action proposals derived from validated MES commands |
+| `GET /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Legacy MES accept/modify/reject decision records for one proposal |
+| `GET /api/v2/action-proposals/{proposal_id}/outcomes` | Execution/quality outcome records for one proposal |
+| `GET /api/v2/action-proposals/{proposal_id}/lifecycle` | Combined lifecycle summary, legacy decisions, and outcomes for one proposal |
+| `GET /api/v2/action-proposals/{proposal_id}/feedback-summary` | Proposed-vs-actual feedback summary for policy evaluation |
+| `GET /api/v2/legacy-adapters` | Source-specific row adapter catalog |
+| `GET /api/v2/source-key-mappings` | Legacy source-system key to canonical AI MES id mappings |
+| `GET /api/v2/source-key-mappings/resolve` | Resolve one source-system key to a canonical AI MES id |
+| `GET /api/v2/ingestion/source-records` | Raw legacy source rows/events preserved as ingestion evidence |
+| `GET /api/v2/ingestion/canonical-records` | Canonical AI MES projections created from ingested source records |
 | `GET /api/v2/ledger-index/{index_name}` | Run-scoped normalized SQLite index rows |
 | `GET /api/v2/genealogy/task/{task_uid}` | Run-scoped task/wafer lineage with assignments, command links, and simulator events |
 | `GET /api/v2/genealogy/equipment/{equipment_id}` | Run-scoped equipment command and process timeline |
 | `GET /api/v2/genealogy/lot/{lot_id}` | Run-scoped lot-level task and command rollout |
 | `GET /api/v2/execution-ledger/{correlation_id}` | Run-scoped command, rule, simulator-action, and post-state ledger |
 | `GET /api/v2/digital-twin/state-at?time=0` | Run-scoped replayable decision-state snapshot at or before time |
+| `GET /api/v2/digital-twin/canonical-state` | Event-sourced production twin state replayed from canonical ingestion records |
+| `GET /api/v2/digital-twin/canonical-decision-state` | Policy-ready decision state built from the canonical twin |
+| `GET /api/v2/digital-twin/candidate-preview` | L1 candidate preview generated from canonical twin decision state |
+| `GET /api/v2/process-tools/catalog` | Read-only process model tool catalog for LLM/MCP callers |
+| `GET /api/v2/process-chat/models` | Continue-style chat model catalog for process chat |
+| `GET /api/v2/agent-runs` | Recent Agent Mode and local fallback run records |
+| `GET /api/v2/agent-runs/{agent_run_id}` | Agent run detail with metadata, tool calls, and step trace |
 
 ## Current Mutation APIs
 
@@ -70,6 +96,15 @@ thin and delegate runtime behavior to `src/mes/runtime/*`.
 | `POST /api/v2/simulation/autoplay/start` | Enable autoplay |
 | `POST /api/v2/simulation/autoplay/stop` | Disable autoplay |
 | `GET /api/v2/simulation/autoplay/status` | Poll autoplay and optionally step |
+| `POST /api/v2/process-tools/{tool_id}/run` | Read-only process model inference with structured input |
+| `POST /api/v2/process-chat` | Process-engineer chat over read-only process tools with LLM/fallback mode |
+| `POST /api/v2/legacy-adapters/{adapter_id}/ingest` | Adapt one source-specific row and ingest it through the canonical contract |
+| `POST /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Record the legacy MES decision for an AI proposal |
+| `POST /api/v2/action-proposals/{proposal_id}/outcomes` | Record actual execution/quality evidence for an AI proposal |
+| `POST /api/v2/source-key-mappings` | Upsert one legacy source-key mapping |
+| `POST /api/v2/ingestion/source-records` | Store one raw source record and optional canonical projection |
+| `POST /api/v2/digital-twin/recommendation-run` | Run L4/L3/L1/L2/Rule Engine against canonical twin state and return an ActionProposal |
+| `POST /api/v2/ai-dev/scenarios/capture-canonical` | Capture a canonical twin scenario for policy experiments |
 
 ## Current V2 Payload Summary
 
@@ -151,6 +186,371 @@ diagnostics.
     ]
 }
 ```
+
+`GET /api/v2/process-tools/catalog` lists process model tools that are safe for
+LLM/MCP use. `POST /api/v2/process-tools/{tool_id}/run` executes one read-only
+inference. The first implemented tool is `predict_process_a_apc`, backed by the
+Process A rule-based APC model.
+
+```python
+POST /api/v2/process-tools/predict_process_a_apc/run
+{
+    "task_rows": [{"task_uid": "T0", "spec_a": [48.0, 53.0]}],
+    "machine_state": {"u": 6, "m_age": 12},
+    "recipe": [10.0, 2.0, 1.0],
+    "current_time": 120
+}
+
+{
+    "tool_id": "predict_process_a_apc",
+    "stage": "A",
+    "model_id": "A_RULE_BASED_APC_PREDICTOR",
+    "read_only": True,
+    "recipe": [10.0, 2.0, 1.0],
+    "predicted_qa": 49.6646,
+    "quality_risk": "LOW",
+    "replace_consumable": True
+}
+```
+
+`POST /api/v2/process-chat` accepts a natural-language process/MES question and
+returns a chat answer plus any tool calls used. `use_llm=true` attempts the local
+Continue-inspired runtime first and falls back to the local A APC parser/tool
+when the model is unavailable. `use_llm=false` runs the local parser/tool
+directly. `mode=agent` runs a multi-step read-only tool loop; `mode=chat` sends
+one model request without tool execution. `max_steps` bounds Agent Mode.
+`model_name` may select any configured chat model by `name` or `model` id. V1
+supports `ollama` and `openai` providers. By default the runtime reads
+`config/mes-process-agent.yaml`; `MES_PROCESS_AGENT_CONFIG` can override this
+path. The model list is filtered to Continue `chat` role models. Continue
+`capabilities` are combined with provider/model autodetection; `tool_use`
+controls native tool-schema sending. Models without native `tool_use` use a
+system-message JSON tool fallback in Agent Mode.
+
+```python
+POST /api/v2/process-chat
+{
+    "message": "A 공정에서 spec_a 48~53이고 u=6, m_age=12, recipe=[10,2,1]이면 QA가 어떻게 나올까?",
+    "use_llm": False,
+    "model_name": "Gemma4 Remote",
+    "mode": "agent",
+    "max_steps": 5
+}
+
+{
+    "agent_run_id": "ARUN_...",
+    "mode": "local_process_tool",
+    "status": "completed",
+    "answer": "A 공정 APC 예측 결과 predicted_qa=49.6646...",
+    "tool_calls": [
+        {
+            "tool_name": "predict_process_a_apc",
+            "status": "executed",
+            "policy": "local_process_tool",
+            "result": {"stage": "A", "quality_risk": "LOW"}
+        }
+    ],
+    "agent_trace": []
+}
+```
+
+Agent Mode may return `mode="llm_agent"`, `status`, `agent_trace`, and multiple
+tool calls. The MES API process registers these read-only tools for Agent Mode:
+`predict_process_a_apc`, `get_fab_snapshot`, `get_policy_stack`,
+`get_candidate_portfolio_latest`, `get_equipment_detail`, and
+`get_assignment_trace`. Non-read-only or unknown tool calls are rejected with
+`status="policy_blocked"` and `policy="excluded"`.
+
+`GET /api/v2/agent-runs` and `GET /api/v2/agent-runs/{agent_run_id}` expose the
+inspection record created by each chat request. In the MES API process these
+records are SQLite-backed through the runtime database path, so recent Agent
+Mode and local fallback runs survive process restarts. Standalone chat service
+usage without a runtime context may still use the in-memory store.
+
+```python
+GET /api/v2/agent-runs/{agent_run_id}
+{
+    "found": True,
+    "agent_run_id": "ARUN_...",
+    "mes_run_id": "RUN_...",
+    "question": "현재 fab 상태와 active policy stack을 보고 병목을 설명해줘",
+    "mode": "agent",
+    "status": "completed",
+    "answer": "A 공정이 병목입니다...",
+    "tool_count": 2,
+    "step_count": 5,
+    "metadata": {
+        "model_name": "gemma4:latest",
+        "provider": "ollama",
+        "max_steps": 5,
+        "prompt_id": "MES_AGENT_SYSTEM_PROMPT",
+        "prompt_version": "0.1.0",
+        "tool_catalog_version": "mes-agent-tools-v1",
+        "requested_think": True
+    },
+    "tool_calls": [
+        {"tool_name": "get_fab_snapshot", "status": "executed"}
+    ],
+    "agent_trace": [
+        {"type": "llm_response", "step": 1, "tool_call_count": 1},
+        {"type": "tool_call", "step": 1, "tool_name": "get_fab_snapshot"}
+    ]
+}
+```
+
+Process and equipment naming is display metadata, not a state/action key
+replacement. Live state, Gantt rows, and equipment detail payloads can include:
+
+```python
+{
+    "stage": "A",
+    "label": "Lithography QA",
+    "equipment_id": "A_0",
+    "display_name": "Lithography Tool 01"
+}
+```
+
+Canonical ids (`A`, `B`, `C`, `A_0`, `B_0`, `C_0`) remain the values used for
+policy decisions, Rule Engine validation, command payloads, and simulator
+actions.
+
+`GET /api/v2/operations` returns the active operation/equipment registry. A/B/C
+are default simulator operations today, but the contract is shaped for future
+production operations loaded from route and equipment master data.
+
+```python
+{
+    "source": "operation_registry",
+    "canonical_id_policy": "operation_id_and_equipment_id_are_stable_contract_keys",
+    "count": 3,
+    "equipment_count": 11,
+    "items": [
+        {
+            "operation_id": "A",
+            "display_name": "Process QA",
+            "operation_type": "process_qa",
+            "equipment_group_id": "A",
+            "execution_boundary": "SIMULATOR_STAGE",
+            "upstream_operation_ids": [],
+            "downstream_operation_ids": ["B"],
+            "batch_size": 3,
+            "process_time": 20,
+            "l1_policy_key": "scheduler_A",
+            "l2_policy_key": "tuner_A",
+            "legacy_submission_mode": "SIMULATOR_ONLY"
+        }
+    ],
+    "equipment": [
+        {
+            "equipment_id": "A_0",
+            "display_name": "A_0",
+            "equipment_group_id": "A",
+            "capable_operations": ["A"],
+            "batch_size": 3,
+            "execution_boundary": "SIMULATOR_STAGE"
+        }
+    ]
+}
+```
+
+`GET /api/v2/action-proposals` returns production-facing proposal envelopes
+derived from validated `MESCommand` records. Optional `correlation_id` and
+`run_id` query parameters filter the result. The contract intentionally says the
+AI layer is proposing an action to legacy MES, not directly driving equipment.
+
+```python
+{
+    "count": 1,
+    "correlation_id": "CORR_...",
+    "run_id": "RUN_...",
+    "items": [
+        {
+            "proposal_id": "PROP_CMD_...",
+            "proposal_type": "LEGACY_MES_ACTION_PROPOSAL",
+            "correlation_id": "CORR_...",
+            "operation_id": "A",
+            "source_command_id": "CMD_...",
+            "source_command_type": "RESERVE_AND_TRACK_IN",
+            "validation_status": "PASSED",
+            "status": "PROPOSED",
+            "candidate_id": "CAND_A_...",
+            "target_equipment_id": "A_0",
+            "target_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+            "policy_refs": {
+                "dispatch_recommendation_id": "REC_L1_...",
+                "recipe_recommendation_id": "REC_L2_..."
+            },
+            "legacy_submission_mode": "SIMULATOR_ONLY",
+            "direct_equipment_control": False,
+            "lifecycle": {
+                "legacy_decision_count": 0,
+                "outcome_count": 0,
+                "latest_legacy_status": "",
+                "latest_outcome_status": ""
+            },
+            "payload": {"stage": "A", "task_uids": [1, 2, 3]}
+        }
+    ]
+}
+```
+
+Action Proposal lifecycle endpoints record the legacy MES feedback loop without
+mutating the simulator command path.
+
+```python
+POST /api/v2/action-proposals/PROP_CMD_123/legacy-decisions
+{
+    "legacy_status": "ACCEPTED",
+    "correlation_id": "CORR_...",
+    "legacy_assignment_id": "LEGACY_ASSIGN_...",
+    "actual_equipment_id": "A_0",
+    "actual_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+    "reason": "legacy mes accepted recommendation",
+    "decision_time": 120
+}
+
+POST /api/v2/action-proposals/PROP_CMD_123/outcomes
+{
+    "outcome_status": "EXECUTED",
+    "correlation_id": "CORR_...",
+    "actual_equipment_id": "A_0",
+    "actual_unit_ids": ["WAFER_1", "WAFER_2", "WAFER_3"],
+    "event_time": 140,
+    "quality_result": {"status": "PASS"},
+    "cycle_time": 20.0,
+    "rework_count": 0
+}
+
+GET /api/v2/action-proposals/PROP_CMD_123/lifecycle
+{
+    "proposal_id": "PROP_CMD_123",
+    "summary": {
+        "legacy_decision_count": 1,
+        "outcome_count": 1,
+        "latest_legacy_status": "ACCEPTED",
+        "latest_outcome_status": "EXECUTED"
+    },
+    "legacy_decisions": [{"decision_id": "LDEC_..."}],
+    "outcomes": [{"outcome_id": "OUT_..."}]
+}
+```
+
+`POST /api/v2/source-key-mappings`, `GET /api/v2/source-key-mappings`, and
+`GET /api/v2/source-key-mappings/resolve` expose the legacy source-key mapping
+boundary. This is the first ingestion-facing contract for connecting legacy
+MES/FDC/RMS/APC/ERP identifiers to canonical AI MES ids.
+
+```python
+POST /api/v2/source-key-mappings
+{
+    "source_system": "LEGACY_MES",
+    "source_table": "WIP_LOT",
+    "source_pk": "LOT123",
+    "entity_type": "LOT",
+    "canonical_id": "LOT_CANON_123",
+    "ingest_time": 100,
+    "event_time": 90,
+    "decision_time": 120,
+    "source_payload": {"LOT_ID": "LOT123"}
+}
+
+{
+    "status": "UPSERTED",
+    "item": {
+        "mapping_id": "SKM_...",
+        "source_key": "LEGACY_MES:WIP_LOT:LOT123",
+        "canonical_id": "LOT_CANON_123",
+        "entity_type": "LOT",
+        "run_id": "RUN_..."
+    }
+}
+```
+
+### Legacy Ingestion Records
+
+`POST /api/v2/ingestion/source-records` stores the original source row/event as
+`RawSourceRecord`. If the payload contains `canonical_id`, the runtime also
+creates a `CanonicalIngestionRecord` and upserts a `SourceKeyMapping`.
+
+```http
+POST /api/v2/ingestion/source-records
+```
+
+```json
+{
+  "source_system": "LEGACY_MES",
+  "source_table": "WIP_LOT",
+  "source_pk": "LOT123",
+  "entity_type": "LOT",
+  "canonical_id": "LOT_CANON_123",
+  "lot_id": "LOT_CANON_123",
+  "operation_id": "A",
+  "event_time": 90,
+  "ingest_time": 100,
+  "decision_time": 120,
+  "canonical": {
+    "event_type": "LOT_WAITING",
+    "attributes": {"priority": "HOT"}
+  },
+  "payload": {"LOT_ID": "LOT123", "OPER": "A"}
+}
+```
+
+List APIs:
+
+```http
+GET /api/v2/ingestion/source-records?source_system=LEGACY_MES&entity_type=LOT
+GET /api/v2/ingestion/canonical-records?canonical_id=LOT_CANON_123
+```
+
+Ledger index names:
+
+```http
+GET /api/v2/ledger-index/raw_source_record_index
+GET /api/v2/ledger-index/canonical_ingestion_index
+```
+
+### Canonical Digital Twin
+
+`GET /api/v2/digital-twin/canonical-state` replays
+`CanonicalIngestionRecord` rows into event-sourced production WIP, unit, and
+equipment state.
+
+```http
+GET /api/v2/digital-twin/canonical-state?at_time=10
+```
+
+`GET /api/v2/digital-twin/canonical-decision-state` converts that replay into
+the existing policy-compatible `decision_state` contract.
+
+```http
+GET /api/v2/digital-twin/canonical-decision-state
+```
+
+`GET /api/v2/digital-twin/candidate-preview` proves the canonical decision
+state can feed the active L1 candidate portfolio generator.
+
+```http
+GET /api/v2/digital-twin/candidate-preview?stage=A
+```
+
+The response includes:
+
+```python
+{
+    "state_source": "CANONICAL_TWIN",
+    "candidate_count": 1,
+    "items": [{"candidate_id": "CAND_A_...", "task_uids": [301, 302]}],
+    "decision_state_summary": {
+        "task_count": 2,
+        "stages": {"A": {"wait": 2, "machines": 1}}
+    }
+}
+```
+
+The mapping record separates `event_time`, `ingest_time`, and `decision_time`.
+Policy code should consume canonical ids and decision-time state rather than raw
+source keys.
 
 `GET /api/v2/ai-dev/policy-stack` returns the active factory-built stack:
 

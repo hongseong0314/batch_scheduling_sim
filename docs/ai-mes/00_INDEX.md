@@ -1,7 +1,7 @@
 # AI MES Canonical Documentation
 
 Status: canonical working specification
-Last updated: 2026-05-15
+Last updated: 2026-05-25
 Scope: simulator-backed semiconductor AI MES, AI decision architecture, MES
 runtime, APIs, and UI control room.
 
@@ -21,7 +21,14 @@ should start here.
 | 6 | [06_UI_CONTROL_ROOM_SPEC.md](06_UI_CONTROL_ROOM_SPEC.md) | Operational UI spec, visual rules, views, and data bindings |
 | 7 | [07_IMPLEMENTATION_ROADMAP.md](07_IMPLEMENTATION_ROADMAP.md) | Build phases, acceptance criteria, tests, and migration strategy |
 | 8 | [08_PRODUCT_UI_FOUNDATION_V1.md](08_PRODUCT_UI_FOUNDATION_V1.md) | Product UI foundation goals, open-design usage, and frontend acceptance criteria |
-| 9 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
+| 9 | [09_PROCESS_APC_MCP_AGENT.md](09_PROCESS_APC_MCP_AGENT.md) | Process A APC tool-calling agent, MCP server, and read-only process model API |
+| 10 | [10_OPERATION_REGISTRY_ACTION_PROPOSAL.md](10_OPERATION_REGISTRY_ACTION_PROPOSAL.md) | Production-transition operation registry and legacy-safe action proposal contract |
+| 11 | [11_LEGACY_SOURCE_KEY_MAPPING.md](11_LEGACY_SOURCE_KEY_MAPPING.md) | Legacy source-system key to canonical AI MES id mapping contract |
+| 12 | [12_RUNTIME_CONFIG.md](12_RUNTIME_CONFIG.md) | External runtime config for simulator/display settings and production-transition naming |
+| 13 | [13_LEGACY_INGESTION_CONTRACT.md](13_LEGACY_INGESTION_CONTRACT.md) | Raw legacy record ingestion and canonical projection contract |
+| 14 | [14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md](14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md) | Event-sourced canonical digital twin and policy-ready decision state |
+| 15 | [15_PRODUCTION_MES_V1_GOALS.md](15_PRODUCTION_MES_V1_GOALS.md) | Six-axis production MES V1 implementation summary |
+| 16 | [archive/README.md](archive/README.md) | Legacy document map and supersession notes |
 
 ## Decision Summary
 
@@ -67,9 +74,15 @@ and maintenance context to the candidates and final command.
   generator, evaluator, and DTO artifacts live under `src/mes/harnessing/`.
 - Treat `src/mes/rule_engine.py` as the execution gate. AI recommendations do
   not directly mutate simulator or MES state.
+- Treat `src/mes/operations/registry.py` as the operation/equipment metadata
+  boundary. A/B/C are default registry entries, not the final production process
+  model.
+- Treat `src/mes/action_proposals.py` as the production-facing command boundary.
+  AI commands become legacy-safe Action Proposals; they do not directly control
+  production equipment.
 - Treat `src/mes/api.py` as route wiring only. Runtime state, simulation
-  control, traceability, equipment detail, and Gantt payload builders live under
-  `src/mes/runtime/`.
+  control, traceability, equipment detail, Gantt payload builders, and
+  feature-specific FastAPI routers live under `src/mes/runtime/`.
 - Treat `src/mes/ui/templates/control_room.html` and `src/mes/ui/static/*` as
   the control-room implementation. `src/mes/live_ui.py` is a compatibility
   import only.
@@ -100,10 +113,53 @@ Implemented today:
   `simulator_actions.py`.
 - Store: in-memory plus SQLite JSON payload persistence and run-scoped
   normalized ledger indexes for audit records, runtime entities, genealogy,
-  assignments, commands, events, and state snapshots.
+  assignments, commands, events, and state snapshots. `SQLiteMESStore` keeps
+  the public API; `src/mes/persistence/*` owns schema, record, and ledger-index
+  internals.
 - API/UI: live simulator-backed MES endpoints and a dense `/mes` control room
   with Candidate Portfolio, Assignment Trace, AI Developer Console, Policy
   Experiment Runner, Product UI Foundation, and Digital Twin Genealogy V1.
+- Process APC/MES tool calling: read-only Process A APC prediction and MES
+  runtime inspection tools are exposed through `src/mes/process_tools/`,
+  `/api/v2/process-tools/*`, `src/mes/mcp/process_apc_server.py`, and the local
+  Continue-inspired `src/mes/agent_runtime/` runtime. The control room also
+  exposes `/mes#chat` for process-engineer natural-language MES/APC questions
+  with Agent Mode, Chat Mode, model selection, compact tool traces, and
+  SQLite-backed `agent_run_id` records. `/mes#ai-dev` includes Agent Run
+  Inspector for model, prompt, tool-call, answer, and step-trace review.
+  Runtime chat models are configured in `config/mes-process-agent.yaml`.
+- Display naming: canonical simulator ids (`A`, `B`, `C`, `A_0`, `B_0`,
+  `C_0`) remain state/action keys, while `stage_display_names` and
+  `equipment_display_names` provide configurable process/tool names for UI and
+  API display payloads. These settings now load from `config/mes-runtime.yaml`
+  or `MES_RUNTIME_CONFIG`.
+- Operation registry: A/B/C and their equipment are exposed through
+  `GET /api/v2/operations`, with operation/equipment definitions designed so
+  real process steps can later be inserted from route/equipment master data.
+- Action proposal boundary: validated MES commands are exposed as
+  `LEGACY_MES_ACTION_PROPOSAL` records through `GET /api/v2/action-proposals`.
+  These proposals explicitly set `direct_equipment_control=false`.
+- Source key mapping: legacy MES/FDC/RMS/ERP identifiers can be linked to
+  canonical AI MES ids through `SourceKeyMapping`,
+  `GET/POST /api/v2/source-key-mappings`, and the
+  `source_key_mapping_index` ledger table.
+- Legacy ingestion contract: source rows/events can be stored as immutable
+  `RawSourceRecord` evidence, projected into `CanonicalIngestionRecord`, linked
+  to `SourceKeyMapping`, and exposed through
+  `/api/v2/ingestion/source-records`,
+  `/api/v2/ingestion/canonical-records`, `raw_source_record_index`, and
+  `canonical_ingestion_index`.
+- Production digital twin backbone: canonical ingestion records can be replayed
+  into `CANONICAL_TWIN` WIP/equipment/unit state, converted to the existing
+  policy-ready `decision_state`, and previewed through L1 candidate generation
+  with `/api/v2/digital-twin/canonical-state`,
+  `/api/v2/digital-twin/canonical-decision-state`, and
+  `/api/v2/digital-twin/candidate-preview`.
+- Production MES V1: canonical twin recommendations now run the full policy
+  stack into legacy-safe action proposals; source-specific adapters, route
+  graph, feedback summary, canonical scenario experiments, and production
+  readiness diagnostics are documented in
+  `15_PRODUCTION_MES_V1_GOALS.md`.
 - Control-room baseline: A has 5 tools with batch size 3 and process time 20;
   B has 3 tools with batch size 2 and process time 8; C has 3 tools with batch
   size 4 and process time 2.

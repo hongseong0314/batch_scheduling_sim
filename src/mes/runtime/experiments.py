@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from src.agents.factory import build_mes_policy_stack
 from src.agents.mes_policies import RuleBasedL4ObjectivePolicy
 from src.mes import MESDevelopmentHarness
+from src.mes.digital_twin import build_canonical_decision_state, build_digital_twin_state
 from src.mes.recommendations import make_id
 from src.mes.runtime.candidate_portfolio import candidate_portfolio
 from src.mes.services import MESDecisionService
@@ -139,6 +140,36 @@ def capture_scenario(context: Any) -> Dict[str, Any]:
         "C": copy.deepcopy(decision_state.get("C", {})),
         "equipment": _equipment_snapshot(decision_state),
         "kpis": copy.deepcopy(decision_state.get("kpis", {})),
+    }
+    context.scenario_snapshots[scenario_id] = copy.deepcopy(scenario)
+    return copy.deepcopy(scenario)
+
+
+def capture_canonical_scenario(
+    context: Any,
+    at_time: Optional[int] = None,
+    run_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    resolved_run_id = str(run_id or getattr(context, "run_id", "") or context.harness.store.current_run_id)
+    records = context.harness.store.canonical_ingestion_records(run_id=resolved_run_id)
+    twin_state = build_digital_twin_state(records, at_time=at_time)
+    decision_state = build_canonical_decision_state(twin_state)
+    scenario_id = make_id("SCN_CANON")
+    scenario = {
+        "scenario_id": scenario_id,
+        "state_source": "CANONICAL_TWIN",
+        "time": int(decision_state.get("time", 0) or 0),
+        "source_correlation_id": context.last_correlation_id,
+        "config": copy.deepcopy(context.env.config),
+        "decision_state": decision_state,
+        "digital_twin_state": twin_state,
+        "tasks": copy.deepcopy(decision_state.get("tasks", {})),
+        "A": copy.deepcopy(decision_state.get("A", {})),
+        "B": copy.deepcopy(decision_state.get("B", {})),
+        "C": copy.deepcopy(decision_state.get("C", {})),
+        "equipment": _equipment_snapshot(decision_state),
+        "kpis": copy.deepcopy(decision_state.get("kpis", {})),
+        "canonical_record_count": len(records),
     }
     context.scenario_snapshots[scenario_id] = copy.deepcopy(scenario)
     return copy.deepcopy(scenario)
@@ -335,6 +366,7 @@ def _scenario_summary(scenario: Dict[str, Any]) -> Dict[str, Any]:
     decision_state = scenario.get("decision_state", {})
     return {
         "scenario_id": scenario["scenario_id"],
+        "state_source": scenario.get("state_source", "SIMULATOR"),
         "time": scenario["time"],
         "source_correlation_id": scenario.get("source_correlation_id"),
         "task_count": len(decision_state.get("tasks", {})),

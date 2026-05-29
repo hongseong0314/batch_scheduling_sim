@@ -128,13 +128,13 @@
         const agentTrace = message.agent_trace || [];
         const toolHtml = toolCalls.length
           ? `<div class="chat-tool-call">${toolCalls.map(call => {
-              return `${escapeText(call.tool_name || "-")} · ${escapeText(call.status || "executed")} · ${escapeText(call.policy || "-")}<br /><span>${escapeText(summarizeToolResult(call.result || call.error || {}))}</span>`;
+              return `${escapeText(formatToolCallLabel(call))}<br /><span>${escapeText(summarizeToolResult(call.result || call.error || {}))}</span>`;
             }).join("<br />")}</div>`
           : "";
         const traceHtml = agentTrace.length
           ? `<div class="chat-agent-trace">${agentTrace.map((step, index) => {
               const label = step.type === "tool_call"
-                ? `${step.tool_name || "-"} · ${step.status || "-"}`
+                ? formatToolCallLabel(step)
                 : `LLM · tools ${step.tool_call_count ?? 0}`;
               return `<span>${index + 1}. ${escapeText(label)}</span>`;
             }).join("")}</div>`
@@ -194,6 +194,12 @@
     function summarizeToolResult(result) {
       if (typeof result === "string") return result;
       if (!result || typeof result !== "object") return "-";
+      if (result.layer === "L1") {
+        return `${result.operation_id || result.stage || "-"} ${result.layer} · candidates ${result.returned_count ?? result.candidate_count ?? 0}/${result.candidate_count ?? 0}`;
+      }
+      if (result.layer === "L2") {
+        return `${result.operation_id || result.stage || "-"} ${result.layer} · annotations ${result.returned_count ?? result.candidate_count ?? 0}/${result.candidate_count ?? 0}`;
+      }
       if (result.predicted_qa !== undefined) {
         return `predicted_qa ${result.predicted_qa} · risk ${result.quality_risk || "-"}`;
       }
@@ -208,6 +214,13 @@
         return `${result.correlation_id || "-"} · count ${result.count ?? "-"}`;
       }
       return JSON.stringify(result).slice(0, 180);
+    }
+
+    function formatToolCallLabel(call) {
+      const layer = call.layer ? `${call.layer} · ` : "";
+      const operation = call.operation_id ? `${call.operation_id} · ` : "";
+      const policyId = call.policy_id ? ` · ${call.policy_id}` : "";
+      return `${layer}${operation}${call.tool_name || "-"} · ${call.status || "executed"} · ${call.policy || "-"}${policyId}`;
     }
 
     function render(live, gantt, aiDev = {}) {
@@ -690,12 +703,12 @@
         <dl>
           <dt>Steps</dt><dd>${trace.map((step, index) => {
             if (step.type === "tool_call") {
-              return `${index + 1}. ${escapeText(step.tool_name || "-")} · ${escapeText(step.status || "-")} · ${escapeText(step.policy || "-")}`;
+              return `${index + 1}. ${escapeText(formatToolCallLabel(step))}`;
             }
             return `${index + 1}. ${escapeText(step.type || "LLM")} · tools ${escapeText(step.tool_call_count ?? 0)}`;
           }).join("<br>") || "-"}</dd>
           <dt>Tool calls</dt><dd>${tools.map(call =>
-            `${escapeText(call.tool_name || "-")} · ${escapeText(call.status || "-")} · ${escapeText(summarizeToolResult(call.result || call.error || {}))}`
+            `${escapeText(formatToolCallLabel(call))} · ${escapeText(summarizeToolResult(call.result || call.error || {}))}`
           ).join("<br>") || "-"}</dd>
         </dl>`;
     }

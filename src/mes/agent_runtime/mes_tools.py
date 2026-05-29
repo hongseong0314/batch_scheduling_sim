@@ -5,6 +5,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
+from src.mes.agent_runtime.layered_process_tools import (
+    LAYERED_PROCESS_TOOL_IDS,
+    layered_process_tool_catalog,
+    run_layered_process_tool,
+)
 from src.mes.process_tools.service import ProcessToolService
 from src.mes.runtime.ai_dev import policy_stack_payload
 from src.mes.runtime.assignment_trace import assignment_trace
@@ -26,6 +31,8 @@ class MESAgentToolService:
 
     def catalog(self) -> Dict[str, Any]:
         tools = list(self.process_tools.catalog()["tools"])
+        if self.context is not None:
+            tools.extend(layered_process_tool_catalog(self.context))
         tools.extend(self._runtime_tool_catalog())
         return {"count": len(tools), "tools": tools}
 
@@ -48,6 +55,10 @@ class MESAgentToolService:
         name = str(tool_id)
         if name in self._process_tool_names():
             return self.process_tools.run_tool(name, arguments)
+        if name in LAYERED_PROCESS_TOOL_IDS:
+            if self.context is None:
+                raise ValueError(f"MES_RUNTIME_CONTEXT_NOT_CONFIGURED:{name}")
+            return run_layered_process_tool(self.context, name, arguments)
         if self.context is None:
             raise ValueError(f"MES_RUNTIME_CONTEXT_NOT_CONFIGURED:{name}")
         if name == "get_fab_snapshot":

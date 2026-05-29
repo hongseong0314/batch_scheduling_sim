@@ -167,12 +167,14 @@
               <div class="panel-header compact-header"><h2>Agent Tools</h2><span>read-only</span></div>
               <div class="point-detail">
                 <div><span>Runtime</span><strong>MES snapshot · policy · trace</strong></div>
-                <div><span>APC</span><strong>predict_process_a_apc</strong></div>
+                <div><span>L1</span><strong>A/B dispatch · C packing candidates</strong></div>
+                <div><span>L2</span><strong>A/B APC · C pack quality annotation</strong></div>
                 <div><span>Policy</span><strong>non-write tools only</strong></div>
               </div>
               <div class="chat-examples">
                 <button class="button compact chat-example" type="button" data-message="A 공정에서 spec_a 48~53이고 u=6, m_age=12, recipe=[10,2,1]이면 QA가 어떻게 나올까?">A APC QA</button>
-                <button class="button compact chat-example" type="button" data-message="A 공정에서 spec_a 47.5~52.5이고 u=2, m_age=5이면 추천 recipe와 품질 위험을 알려줘">A recipe</button>
+                <button class="button compact chat-example" type="button" data-message="현재 A 공정 L1 후보와 L2 APC annotation을 보고 어떤 batch가 좋은지 설명해줘">A L1/L2</button>
+                <button class="button compact chat-example" type="button" data-message="현재 C packing 후보를 material/color grouping 기준으로 비교하고 품질 위험을 설명해줘">C pack</button>
                 <button class="button compact chat-example" type="button" data-message="현재 fab 상태와 active policy stack을 보고 어떤 공정이 병목인지 설명해줘">Fab state</button>
               </div>
             </aside>

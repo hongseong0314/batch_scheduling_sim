@@ -120,6 +120,8 @@ class MESAgentRuntime:
                         "arguments": arguments,
                         "status": "rejected",
                         "policy": policy["policy"],
+                        "layer": policy.get("layer", ""),
+                        "policy_id": policy.get("policy_id", ""),
                         "error": policy["reason"],
                     }
                     executed_calls.append(rejected)
@@ -130,6 +132,8 @@ class MESAgentRuntime:
                             "tool_name": tool_name,
                             "status": "rejected",
                             "policy": policy["policy"],
+                            "layer": policy.get("layer", ""),
+                            "policy_id": policy.get("policy_id", ""),
                             "error": policy["reason"],
                         }
                     )
@@ -160,6 +164,9 @@ class MESAgentRuntime:
                     "result": result,
                     "status": status,
                     "policy": policy["policy"],
+                    "layer": policy.get("layer", ""),
+                    "operation_id": policy.get("operation_id", ""),
+                    "policy_id": policy.get("policy_id", ""),
                 }
                 if error:
                     executed["error"] = error
@@ -171,6 +178,9 @@ class MESAgentRuntime:
                         "tool_name": tool_name,
                         "status": status,
                         "policy": policy["policy"],
+                        "layer": policy.get("layer", ""),
+                        "operation_id": policy.get("operation_id", ""),
+                        "policy_id": policy.get("policy_id", ""),
                         "result": result,
                         "error": error,
                     }
@@ -216,17 +226,26 @@ class MESAgentRuntime:
             return {
                 "action": "block",
                 "policy": "excluded",
+                "layer": "",
+                "operation_id": "",
+                "policy_id": "",
                 "reason": f"UNKNOWN_TOOL:{tool_name}",
             }
         if not bool(tool.get("read_only", False)):
             return {
                 "action": "block",
                 "policy": "excluded",
+                "layer": str(tool.get("layer", "")),
+                "operation_id": str(tool.get("operation_id") or tool.get("stage") or ""),
+                "policy_id": str(tool.get("policy_id", "")),
                 "reason": f"NON_READ_ONLY_TOOL:{tool_name}",
             }
         return {
             "action": "execute",
             "policy": "allowedWithoutPermission",
+            "layer": str(tool.get("layer", "")),
+            "operation_id": str(tool.get("operation_id") or tool.get("stage") or ""),
+            "policy_id": str(tool.get("policy_id", "")),
             "reason": "READ_ONLY_TOOL",
         }
 
@@ -248,6 +267,8 @@ class MESAgentRuntime:
             "Answer process-engineer questions using the current MES state and "
             "read-only prediction/inspection tools when needed. Never claim that "
             "a recipe, dispatch, equipment state, or MES record was changed. "
+            "Use L1 tools to inspect local candidate generation, L2 tools to inspect "
+            "APC/process annotations, and runtime tools to inspect L3/L4 policy context. "
             "Write concise Korean answers unless the user asks otherwise."
         )
         if (

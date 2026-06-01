@@ -1,7 +1,17 @@
 # Runtime, Harness, Rule Engine, And Commands
 
-Status: canonical  
-Last updated: 2026-05-10
+Status: canonical
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: runtime/backend developers who need to understand how
+recommendations become validated commands or action proposals.
+
+Use this when modifying the harness, planner/generator/evaluator, Rule Engine,
+command records, simulator adapter, or production action boundary.
+
+Read after: [04_LAYERED_AI_DECISION_ARCHITECTURE.md](04_LAYERED_AI_DECISION_ARCHITECTURE.md).
 
 ## Purpose
 
@@ -58,6 +68,56 @@ Implementation map:
 | Policy factory | `src/agents/factory.py` |
 | L3/L4 policies | `src/agents/mes_policies.py` |
 | Runtime orchestration | `src/mes/runtime/simulation_control.py` |
+
+## End-To-End Runtime Flow
+
+```mermaid
+flowchart TD
+  API["FastAPI routes"] --> Ctx["MESAPIContext"]
+  Ctx --> Env["ManufacturingEnv or canonical decision state"]
+  Ctx --> Harness["MESDevelopmentHarness facade"]
+  Harness --> Planner["MESPlannerAgent"]
+  Planner --> Stack["MESPolicyStack from factory.py"]
+  Stack --> L1["L1 candidate generation"]
+  L1 --> L2["L2 annotation"]
+  L2 --> L4["L4 objective policy"]
+  L4 --> L3["L3 meta scheduler policy"]
+  L3 --> Generator["MESGeneratorAgent"]
+  Generator --> Rule["MESRuleEngine"]
+  Rule --> Command["MESCommand"]
+  Command --> Evaluator["MESEvaluatorAgent"]
+  Evaluator --> Store["InMemoryMESStore or SQLiteMESStore"]
+  Command --> Adapter["Simulator action adapter or ActionProposal"]
+  Adapter --> EnvStep["env.step in simulator mode"]
+  EnvStep --> Store
+```
+
+The important boundary is that the harness creates recommendations and commands
+through policies and validation. The environment only changes through
+`env.step(actions)` in simulator mode, and production mode should emit
+ActionProposal records for legacy MES review.
+
+## Runtime Mode Split
+
+```mermaid
+flowchart TD
+  Stack["Policy stack output"] --> Validate["Rule Engine"]
+  Validate --> Command["MESCommand"]
+
+  Command --> SimMode["Simulator mode"]
+  SimMode --> Adapter["simulator action adapter"]
+  Adapter --> Env["env.step(actions)"]
+
+  Command --> ProdMode["Production-transition mode"]
+  ProdMode --> Proposal["ActionProposal"]
+  Proposal --> Review["human or legacy MES review"]
+  Review --> Legacy["legacy MES/RMS execution path"]
+```
+
+The same validated command can support two runtime destinations. The simulator
+destination mutates the local environment for experimentation. The production
+destination records a proposal and waits for an external authority to accept,
+modify, or reject it.
 
 Current `run()` flow:
 

@@ -1,13 +1,46 @@
 # MES Domain Model
 
-Status: canonical  
-Last updated: 2026-05-24
+Status: canonical
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: backend developers, data engineers, and API developers who need
+the shared MES vocabulary before reading endpoint contracts or persistence code.
+
+Use this when mapping simulator objects to MES entities, adding DTO fields, or
+designing normalized production tables.
+
+Read after: [03_ABC_CANONICAL_SCHEMA_REFERENCE.md](03_ABC_CANONICAL_SCHEMA_REFERENCE.md).
 
 ## Purpose
 
 This document defines the MES domain vocabulary and how it maps to the current
 simulator. It is the data model reference for APIs, stores, UI screens, and
 future normalized database work.
+
+## Domain Relationship Map
+
+```mermaid
+erDiagram
+  PRODUCT ||--o{ LOT : "classifies"
+  ROUTE ||--o{ LOT : "routes"
+  LOT ||--o{ WAFER : "contains"
+  WAFER }o--|| OPERATION : "currently_at"
+  OPERATION ||--o{ EQUIPMENT : "can_run_on"
+  OPERATION ||--o{ RECIPE : "allows"
+  EQUIPMENT ||--o{ ASSIGNMENT : "executes"
+  WAFER ||--o{ ASSIGNMENT : "is_assigned"
+  ASSIGNMENT ||--o{ EVENT : "emits"
+  ASSIGNMENT ||--o{ QUALITY_RESULT : "produces"
+  SOURCE_KEY_MAPPING }o--|| LOT : "may_resolve"
+  SOURCE_KEY_MAPPING }o--|| WAFER : "may_resolve"
+  SOURCE_KEY_MAPPING }o--|| EQUIPMENT : "may_resolve"
+```
+
+This is the target mental model even while the current simulator uses compact
+`Task` and `Machine` objects. The MES layer expands simulator state into
+entities that production systems and traceability screens can reason about.
 
 ## Simulator To MES Mapping
 

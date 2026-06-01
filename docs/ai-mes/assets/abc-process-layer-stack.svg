@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180" role="img" aria-labelledby="title desc">
+  <title id="title">A/B/C process-layer AI MES architecture</title>
+  <desc id="desc">A paper-style systems figure showing A, B, and C process modules. Each process contains an L1 local candidate generator and an L2 process model. L3 coordinates the process chain, and L4 controls the global objective.</desc>
+  <defs>
+    <marker id="arrow-dark" viewBox="0 0 10 10" refX="8.2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#253247"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2463a6"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8.2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a15c1f"/>
+    </marker>
+    <filter id="soft-shadow" x="-10%" y="-15%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#1f2937" flood-opacity="0.10"/>
+    </filter>
+    <linearGradient id="l4-grad" x1="0" x2="1">
+      <stop offset="0" stop-color="#f5f7fb"/>
+      <stop offset="1" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="l3-grad" x1="0" x2="1">
+      <stop offset="0" stop-color="#f2f7fb"/>
+      <stop offset="1" stop-color="#e9f3ff"/>
+    </linearGradient>
+    <style>
+      .bg { fill: #fbfcfe; }
+      .paper { fill: #ffffff; stroke: #cfd6e3; stroke-width: 1.2; filter: url(#soft-shadow); }
+      .rule { stroke: #d7deea; stroke-width: 1; }
+      .title { font: 40px Georgia, 'Times New Roman', serif; font-weight: 700; fill: #152033; }
+      .subtitle { font: 21px Arial, sans-serif; fill: #4f5f74; }
+      .panel-title { font: 25px Arial, sans-serif; font-weight: 700; fill: #152033; letter-spacing: .2px; }
+      .label { font: 21px Arial, sans-serif; font-weight: 700; fill: #152033; }
+      .body { font: 17px Arial, sans-serif; fill: #344256; }
+      .small { font: 15px Arial, sans-serif; fill: #5d6b7e; }
+      .micro { font: 13px Arial, sans-serif; fill: #657286; }
+      .mono { font: 17px 'Helvetica Neue', Arial, sans-serif; fill: #152033; }
+      .math { font: italic 19px Georgia, 'Times New Roman', serif; fill: #152033; }
+      .box { fill: #ffffff; stroke: #c9d2df; stroke-width: 1.2; }
+      .l4 { fill: url(#l4-grad); stroke: #6c7aa3; stroke-width: 1.4; }
+      .l3 { fill: url(#l3-grad); stroke: #2463a6; stroke-width: 1.5; }
+      .proc { fill: #ffffff; stroke: #9aa8bb; stroke-width: 1.3; }
+      .l1 { fill: #f8fafc; stroke: #596b81; stroke-width: 1.1; }
+      .l2 { fill: #fffaf3; stroke: #b77b35; stroke-width: 1.1; }
+      .evidence { fill: #f6f8fb; stroke: #b8c2d1; stroke-width: 1; stroke-dasharray: 6 6; }
+      .accent-blue { stroke: #2463a6; stroke-width: 2.6; fill: none; marker-end: url(#arrow-blue); }
+      .accent-amber { stroke: #a15c1f; stroke-width: 2.6; fill: none; marker-end: url(#arrow-amber); }
+      .dark-line { stroke: #253247; stroke-width: 2.2; fill: none; marker-end: url(#arrow-dark); }
+      .thin { stroke-width: 1.4; }
+      .dash { stroke-dasharray: 8 8; }
+      .no-arrow { marker-end: none; }
+      .node { fill: #ffffff; stroke: #2463a6; stroke-width: 1.4; }
+      .node-b { fill: #ffffff; stroke: #2f7b61; stroke-width: 1.4; }
+      .node-c { fill: #ffffff; stroke: #a15c1f; stroke-width: 1.4; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1800" height="1180"/>
+  <rect x="55" y="42" width="1690" height="1088" rx="18" class="paper"/>
+
+  <text x="105" y="106" class="title">Process-Coupled Four-Layer Decision Architecture</text>
+  <text x="105" y="141" class="subtitle">A, B, and C retain local L1/L2 intelligence; L3 coordinates the line; L4 controls objective weights and governance.</text>
+  <line x1="105" y1="170" x2="1695" y2="170" class="rule"/>
+
+  <!-- L4 objective band -->
+  <rect x="170" y="205" width="1460" height="122" rx="8" class="l4"/>
+  <text x="205" y="247" class="panel-title">(d) L4 objective layer</text>
+  <text x="205" y="284" class="body">System objective and governance before any local action is finalized.</text>
+  <text x="205" y="308" class="small">Weights: throughput, yield, tardiness, WIP balance, customer priority, cost, safety policy</text>
+  <text x="1215" y="246" class="math">pi<tspan baseline-shift="sub" font-size="13">L4</tspan>(o | S<tspan baseline-shift="sub" font-size="13">fab</tspan>)</text>
+  <text x="1215" y="280" class="small">objective id + weights</text>
+  <text x="1215" y="305" class="small">budget + validation mode</text>
+  <g transform="translate(840 229)">
+    <rect x="0" y="0" width="65" height="52" rx="4" fill="#ffffff" stroke="#aeb8c9"/>
+    <rect x="12" y="31" width="7" height="13" fill="#6c7aa3"/>
+    <rect x="27" y="20" width="7" height="24" fill="#6c7aa3"/>
+    <rect x="42" y="10" width="7" height="34" fill="#6c7aa3"/>
+    <path d="M 8 11 C 21 21 30 7 56 18" stroke="#6c7aa3" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- L3 coordination band -->
+  <rect x="205" y="385" width="1390" height="150" rx="8" class="l3"/>
+  <text x="240" y="431" class="panel-title">(c) L3 cross-process meta scheduler</text>
+  <text x="240" y="466" class="body">Consumes A/B/C portfolios and L2 annotations.</text>
+  <text x="240" y="496" class="body">Allocates stage, group, candidate, and execution budget across the line.</text>
+  <text x="1205" y="430" class="math">pi<tspan baseline-shift="sub" font-size="13">L3</tspan>(g, c, b | P, o)</text>
+  <text x="1205" y="464" class="small">selected stage/group</text>
+  <text x="1205" y="489" class="small">budget + upper score</text>
+  <g transform="translate(835 421)">
+    <circle cx="0" cy="34" r="14" class="node"/>
+    <circle cx="74" cy="12" r="14" class="node-b"/>
+    <circle cx="148" cy="34" r="14" class="node-c"/>
+    <circle cx="74" cy="68" r="14" fill="#ffffff" stroke="#6c7aa3" stroke-width="1.4"/>
+    <line x1="14" y1="30" x2="60" y2="16" stroke="#7d8da3" stroke-width="2"/>
+    <line x1="88" y1="16" x2="134" y2="30" stroke="#7d8da3" stroke-width="2"/>
+    <line x1="14" y1="38" x2="60" y2="64" stroke="#7d8da3" stroke-width="2"/>
+    <line x1="88" y1="64" x2="134" y2="38" stroke="#7d8da3" stroke-width="2"/>
+    <line x1="74" y1="26" x2="74" y2="54" stroke="#7d8da3" stroke-width="2"/>
+  </g>
+
+  <!-- L4 to L3 arrow -->
+  <path d="M 900 327 L 900 385" class="accent-amber"/>
+  <text x="920" y="362" class="small">objective weights</text>
+
+  <!-- Process modules -->
+  <g id="process-a">
+    <rect x="115" y="670" width="500" height="330" rx="9" class="proc"/>
+    <rect x="115" y="670" width="500" height="63" rx="9" fill="#f3f7fc" stroke="#9aa8bb"/>
+    <text x="142" y="711" class="panel-title">(a1) Process A: Lithography QA</text>
+    <text x="142" y="756" class="body">Batch process QA. Quality depends on recipe</text>
+    <text x="142" y="781" class="body">and consumable state.</text>
+    <g transform="translate(508 689)">
+      <ellipse cx="31" cy="18" rx="34" ry="10" fill="#ffffff" stroke="#2463a6" stroke-width="1.6"/>
+      <path d="M -3 18 C 7 36 55 36 65 18" fill="none" stroke="#2463a6" stroke-width="1.6"/>
+      <path d="M 0 10 C 18 16 43 16 62 10" fill="none" stroke="#2463a6" stroke-width="1.2"/>
+    </g>
+    <rect x="145" y="788" width="440" height="92" rx="5" class="l1"/>
+    <text x="168" y="818" class="label">L1-A local scheduler</text>
+    <text x="168" y="846" class="body">Feasible equipment-batch candidates</text>
+    <text x="168" y="868" class="small">features: wait, batch size, due date</text>
+    <rect x="145" y="896" width="440" height="86" rx="5" class="l2"/>
+    <text x="168" y="926" class="label">L2-A APC / tuner</text>
+    <text x="168" y="954" class="body">Recipe, predicted QA, consumable risk</text>
+    <text x="168" y="974" class="small">output: recipe + QA risk</text>
+  </g>
+
+  <g id="process-b">
+    <rect x="650" y="670" width="500" height="330" rx="9" class="proc"/>
+    <rect x="650" y="670" width="500" height="63" rx="9" fill="#f3fbf7" stroke="#9aa8bb"/>
+    <text x="677" y="711" class="panel-title">(a2) Process B: Wet Clean QA</text>
+    <text x="677" y="756" class="body">Cleaning QA. Risk depends on recipe,</text>
+    <text x="677" y="781" class="body">solution condition, and queue state.</text>
+    <g transform="translate(1052 683)">
+      <path d="M 38 0 C 62 31 72 46 72 62 C 72 82 56 96 37 96 C 18 96 2 82 2 62 C 2 46 13 30 38 0 Z" fill="#ffffff" stroke="#2f7b61" stroke-width="1.7"/>
+      <path d="M 18 65 L 58 65" stroke="#2f7b61" stroke-width="1.8"/>
+    </g>
+    <rect x="680" y="788" width="440" height="92" rx="5" class="l1"/>
+    <text x="703" y="818" class="label">L1-B local scheduler</text>
+    <text x="703" y="846" class="body">Feasible cleaning batch candidates</text>
+    <text x="703" y="868" class="small">features: queue, cleaner, due date</text>
+    <rect x="680" y="896" width="440" height="86" rx="5" class="l2"/>
+    <text x="703" y="926" class="label">L2-B APC / tuner</text>
+    <text x="703" y="954" class="body">Cleaning recipe and solution risk</text>
+    <text x="703" y="974" class="small">output: recipe + replace flag</text>
+  </g>
+
+  <g id="process-c">
+    <rect x="1185" y="670" width="500" height="330" rx="9" class="proc"/>
+    <rect x="1185" y="670" width="500" height="63" rx="9" fill="#fff8ee" stroke="#9aa8bb"/>
+    <text x="1212" y="711" class="panel-title">(a3) Process C: Final Packing</text>
+    <text x="1212" y="756" class="body">Packing. Batch quality depends on material,</text>
+    <text x="1212" y="781" class="body">color, and customer grouping.</text>
+    <g transform="translate(1594 690)">
+      <path d="M 0 20 L 48 0 L 96 20 L 96 75 L 48 98 L 0 75 Z" fill="#ffffff" stroke="#a15c1f" stroke-width="1.7"/>
+      <path d="M 0 20 L 48 43 L 96 20" fill="none" stroke="#a15c1f" stroke-width="1.5"/>
+      <path d="M 48 43 L 48 98" fill="none" stroke="#a15c1f" stroke-width="1.5"/>
+      <path d="M 22 10 L 72 33" stroke="#a15c1f" stroke-width="1.3"/>
+    </g>
+    <rect x="1215" y="788" width="440" height="92" rx="5" class="l1"/>
+    <text x="1238" y="818" class="label">L1-C local packer</text>
+    <text x="1238" y="846" class="body">Feasible packing combinations</text>
+    <text x="1238" y="868" class="small">features: batch, group, wait</text>
+    <rect x="1215" y="896" width="440" height="86" rx="5" class="l2"/>
+    <text x="1238" y="926" class="label">L2-C pack quality</text>
+    <text x="1238" y="954" class="body">Material/color compatibility and risk</text>
+    <text x="1238" y="974" class="small">output: pack quality + risk</text>
+  </g>
+
+  <!-- Physical process flow -->
+  <path d="M 615 835 L 650 835" class="dark-line"/>
+  <path d="M 1150 835 L 1185 835" class="dark-line"/>
+  <text x="625" y="816" class="micro">move / track-out</text>
+  <text x="1160" y="816" class="micro">move / track-out</text>
+
+  <!-- Evidence upward to L3 -->
+  <path d="M 365 788 C 365 620 470 585 630 535" class="accent-blue"/>
+  <path d="M 900 788 C 900 628 900 585 900 535" class="accent-blue"/>
+  <path d="M 1435 788 C 1435 620 1330 585 1170 535" class="accent-blue"/>
+  <text x="255" y="613" class="small">candidate portfolio + L2 evidence</text>
+  <text x="777" y="613" class="small">candidate portfolio + L2 evidence</text>
+  <text x="1268" y="613" class="small">candidate portfolio + L2 evidence</text>
+
+  <!-- Intent downward to local finalizers -->
+  <path d="M 650 535 C 525 585 470 640 410 788" class="accent-amber dash"/>
+  <path d="M 900 535 C 900 610 900 690 900 788" class="accent-amber dash"/>
+  <path d="M 1150 535 C 1275 585 1330 640 1390 788" class="accent-amber dash"/>
+  <text x="673" y="567" class="small">selected stage / group / budget</text>
+
+  <!-- Rule engine and command boundary -->
+  <rect x="240" y="1036" width="1320" height="58" rx="6" class="evidence"/>
+  <text x="270" y="1071" class="body">Traceability contract:</text>
+  <text x="438" y="1071" class="small">L4 objective -> L3 stage/group selection -> L1 candidate -> L2 annotation -> Rule Engine -> Command / ActionProposal</text>
+
+  <!-- Legend -->
+  <g transform="translate(1195 102)">
+    <rect x="0" y="0" width="410" height="48" rx="4" fill="#ffffff" stroke="#d7deea"/>
+    <path d="M 24 17 L 72 17" class="accent-blue no-arrow"/>
+    <text x="86" y="23" class="small">upward evidence</text>
+    <path d="M 222 17 L 270 17" class="accent-amber dash no-arrow"/>
+    <text x="284" y="23" class="small">downward intent</text>
+  </g>
+
+  <!-- Caption -->
+  <text x="105" y="1148" class="micro">Fig. 2. Process-coupled four-layer AI MES architecture. Local L1/L2 agents remain inside each operation, while L3 and L4 operate across the line.</text>
+</svg>

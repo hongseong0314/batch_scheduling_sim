@@ -1,7 +1,18 @@
 # A/B/C Canonical Schema Reference V1
 
-Status: implemented reference contract  
-Last updated: 2026-05-28
+Status: implemented reference contract
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: policy developers, data engineers, and LLM tool developers who
+need a concrete A/B/C example before generalizing to real operations.
+
+Use this when defining state fields, candidate rows, APC annotations, tool
+inputs, and action proposal payloads for a new process.
+
+Read after: [01_ARCHITECTURE_FLOW_GUIDE.md](01_ARCHITECTURE_FLOW_GUIDE.md) and
+before [04_LAYERED_AI_DECISION_ARCHITECTURE.md](04_LAYERED_AI_DECISION_ARCHITECTURE.md).
 
 ## Purpose
 
@@ -13,6 +24,20 @@ A: Lithography QA / Process QA
 B: Wet Clean QA / Clean QA
 C: Final Packing
 ```
+
+Here, "canonical" means the AI MES internal standard shape. Legacy source names
+and simulator object names can differ, but policy code, traces, APIs, and LLM
+tools should read this normalized shape.
+
+The runtime also exposes the broader production schema contract through:
+
+```http
+GET /api/v2/production/schema
+GET /api/v2/production/data-quality
+```
+
+Use this document for the A/B/C example shape. Use the API contract when
+checking the current implementation's production data surfaces and diagnostics.
 
 The goal is not to freeze production to A/B/C. The goal is to make A/B/C a
 complete example that future real operations can copy:
@@ -27,6 +52,70 @@ new operation
 -> L3/L4 portfolio selection
 -> action proposal
 ```
+
+## Schema Flow
+
+```mermaid
+flowchart TD
+  Unit["Canonical unit / task"] --> Queue["Operation queue"]
+  Equip["Canonical equipment"] --> Queue
+  Operation["Canonical operation"] --> Queue
+  Queue --> L1["L1 candidate"]
+  L1 --> L2["L2 annotation"]
+  L2 --> L3["L3/L4 portfolio selection"]
+  L3 --> Proposal["Action proposal"]
+  Proposal --> Outcome["Legacy MES outcome evidence"]
+```
+
+The A/B/C examples below should be read as the minimum production schema shape:
+unit attributes, equipment capabilities, operation metadata, candidate rows,
+process annotations, and the final proposal link. New operations should add
+operation-specific fields without changing the common candidate/annotation
+contract.
+
+This schema exists because the AI MES must compare manufacturing decisions, not
+just schedule jobs. The same candidate row has to carry enough information for
+L1 to describe local feasibility, L2 to describe process/APC implications, and
+L3/L4 to compare competing business and flow objectives. Without this shared
+shape, each process would optimize locally and the system could not explain why
+a lower local score was still the correct manufacturing decision.
+
+## A/B/C Contract Map
+
+```mermaid
+flowchart LR
+  subgraph A["A Lithography QA"]
+    AUnit["unit/task specs"]
+    AEquip["lithography QA tools"]
+    AL1["L1-A batch candidate"]
+    AL2["L2-A recipe/APC annotation"]
+  end
+
+  subgraph B["B Wet Clean QA"]
+    BUnit["incoming clean/QA units"]
+    BEquip["wet clean tools"]
+    BL1["L1-B clean batch candidate"]
+    BL2["L2-B solution/recipe annotation"]
+  end
+
+  subgraph C["C Final Packing"]
+    CUnit["material/color/customer units"]
+    CEquip["packing tools"]
+    CL1["L1-C pack candidate"]
+    CL2["L2-C pack quality annotation"]
+  end
+
+  A --> B --> C
+  AL2 --> Portfolio["candidate portfolio"]
+  BL2 --> Portfolio
+  CL2 --> Portfolio
+  Portfolio --> Upper["L3/L4 selection"]
+  Upper --> Proposal["action proposal"]
+```
+
+The common contract is the portfolio row. A, B, and C may use different local
+features, but every process must expose candidates and annotations in a shape
+that L3/L4 can compare.
 
 ## Canonical Unit / Task
 

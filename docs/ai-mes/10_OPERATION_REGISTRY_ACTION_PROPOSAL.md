@@ -1,7 +1,18 @@
 # Operation Registry And Action Proposal
 
-Status: canonical production-transition specification  
-Last updated: 2026-05-25
+Status: canonical production-transition specification
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: production integration engineers and backend developers
+generalizing beyond the current A/B/C simulator stages.
+
+Use this when adding operations, equipment metadata, route graph fields,
+display names, or the legacy-safe action proposal boundary.
+
+Read after: [02_SYSTEM_VISION.md](02_SYSTEM_VISION.md) and
+[05_RUNTIME_HARNESS_RULE_ENGINE.md](05_RUNTIME_HARNESS_RULE_ENGINE.md).
 
 ## Purpose
 
@@ -21,6 +32,27 @@ Legacy MES/RMS/APC/FDC systems decide whether and how to execute it.
 This lets the AI layer keep producing concrete recommendations and predicted
 actions while preserving the real plant boundary where legacy MES remains the
 system of record and execution authority.
+
+## Registry To Proposal Flow
+
+```mermaid
+flowchart TD
+  Config["runtime config or master data"] --> Registry["operation/equipment registry"]
+  Registry --> PolicyBinding["L1/L2/L3/L4 policy keys"]
+  Registry --> Display["display names and route graph"]
+  Registry --> Capability["equipment capability lookup"]
+
+  PolicyBinding --> Candidate["candidate generation"]
+  Capability --> Candidate
+  Candidate --> Command["validated MESCommand"]
+  Command --> Proposal["ActionProposal"]
+  Proposal --> LegacyDecision["legacy MES accept/modify/reject"]
+  LegacyDecision --> Outcome["execution and quality outcome"]
+```
+
+The registry is the generalization point. A/B/C remain valid canonical ids for
+the simulator, but production operation ids can enter through the registry
+without rewriting the policy and UI contracts.
 
 ## Operation Registry V1
 

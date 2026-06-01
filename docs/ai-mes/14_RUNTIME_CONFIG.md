@@ -1,7 +1,18 @@
 # Runtime Config
 
-Status: canonical production-transition specification  
-Last updated: 2026-05-25
+Status: canonical production-transition specification
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: operators, backend developers, and simulation users who need to
+change process names, equipment names, machine counts, batch sizes, or process
+times without editing Python code.
+
+Use this when configuring a local experiment or preparing a production-shaped
+operation registry.
+
+Read after: [10_OPERATION_REGISTRY_ACTION_PROPOSAL.md](10_OPERATION_REGISTRY_ACTION_PROPOSAL.md).
 
 ## Purpose
 
@@ -12,6 +23,23 @@ This is a transition step toward production operation insertion. The simulator
 still uses canonical ids such as `A`, `B`, `C`, `A_0`, `B_0`, and `C_0`, but
 process names, equipment names, batch sizes, process times, and machine counts
 can now be changed without editing `MESAPIContext`.
+
+## Config Load Flow
+
+```mermaid
+flowchart TD
+  File["config/mes-runtime.yaml"] --> Loader["runtime config loader"]
+  EnvVar["MES_RUNTIME_CONFIG override"] --> Loader
+  Loader --> Normalized["normalized simulator config"]
+  Normalized --> Env["ManufacturingEnv"]
+  Normalized --> Registry["operation/equipment registry"]
+  Normalized --> UI["display names in UI/API"]
+  Normalized --> Policies["policy factory inputs"]
+```
+
+The config file controls experiment shape and display naming. It should not
+change canonical state/action ids unless a future adapter explicitly maps
+production ids into the AI MES namespace.
 
 ## Config Location
 

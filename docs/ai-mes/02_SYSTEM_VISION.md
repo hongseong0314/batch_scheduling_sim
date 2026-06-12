@@ -1,7 +1,17 @@
 # System Vision
 
-Status: canonical  
-Last updated: 2026-05-10
+Status: canonical
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: product owners, engineering leads, and new contributors who
+need the system-level intent before reading implementation contracts.
+
+Use this when deciding what the AI MES is allowed to do, what it must not do,
+and how simulator MVP work connects to production-safe deployment.
+
+Read after: [01_ARCHITECTURE_FLOW_GUIDE.md](01_ARCHITECTURE_FLOW_GUIDE.md).
 
 ## Goal
 
@@ -9,7 +19,7 @@ Build a simulator-backed semiconductor AI MES that turns the current A -> B -> C
 manufacturing simulation into an auditable decision system:
 
 ```text
-A: machining / process QA -> B: cleaning / process QA -> C: packing
+A: Lithography QA -> B: Wet Clean QA -> C: Final Packing
 ```
 
 The system must show and persist:
@@ -26,10 +36,39 @@ This is an MES control and research system, not a marketing demo. The primary
 purpose is to study and operate layered AI decisions without mixing decision
 logic into simulator physics.
 
+The reason for this architecture is that manufacturing decisions can no longer
+be reduced to one scheduling objective. High-mix, low-volume production creates
+conflicts between local feasibility, process setup/quality risk, WIP flow,
+due-date pressure, customer priority, and safety constraints. The AI MES
+separates those concerns into layers so each decision can be explained,
+validated, and improved without hiding the tradeoff.
+
+## Vision Flow
+
+```mermaid
+flowchart TD
+  Sim["Simulator A/B/C line"] --> State["decision_state"]
+  Legacy["Future legacy MES/RMS/FDC/ERP data"] --> Canon["AI MES standard representation"]
+  Canon --> Twin["Digital twin decision_state"]
+  State --> Policy["L1/L2/L3/L4 policy stack"]
+  Twin --> Policy
+  Policy --> Rule["Rule Engine validation"]
+  Rule --> SimCmd["Simulator command in MVP"]
+  Rule --> Proposal["Action Proposal in production path"]
+  Proposal --> LegacyMES["Legacy MES execution authority"]
+```
+
+The vision is one architecture with two data sources. Today, the simulator
+produces `decision_state`. Later, production data produces the same kind of
+policy-ready state through canonical ingestion and digital-twin replay. The
+policy and traceability layer should not care whether the state came from the
+simulator or production adapters.
+
 ## Product Principle
 
-AI recommends. The Rule Engine validates. MES executes. The environment only
-applies validated actions and physics.
+AI recommends. The Rule Engine validates. The simulator applies validated
+actions in MVP mode. In production-transition mode, validated commands become
+legacy-safe Action Proposals for review or downstream legacy MES handling.
 
 ```text
 Decision state
@@ -40,7 +79,8 @@ Decision state
   -> event/audit/KPI update
 ```
 
-No AI policy should directly call `env.step()` or mutate process state.
+No AI policy should directly call `env.step()`, mutate process state, or submit
+direct equipment commands.
 
 ## System Boundaries
 

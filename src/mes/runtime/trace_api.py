@@ -17,6 +17,7 @@ from src.mes.runtime.decision_trace import decision_chain as build_decision_chai
 from src.mes.runtime.digital_twin import (
     canonical_candidate_preview_payload,
     canonical_decision_state_payload,
+    canonical_genealogy_payload,
     canonical_twin_state_payload,
     run_canonical_recommendation_payload,
 )
@@ -78,6 +79,19 @@ def build_trace_router(context: Any) -> APIRouter:
     @router.get("/api/v2/genealogy/lot/{lot_id}")
     def genealogy_lot(lot_id: str, run_id: Optional[str] = Query(None)) -> Dict[str, Any]:
         return build_lot_genealogy(context, lot_id, run_id=run_id)
+
+    @router.get("/api/v2/genealogy/canonical/{entity_type}/{canonical_id}")
+    def genealogy_canonical(
+        entity_type: str,
+        canonical_id: str,
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return canonical_genealogy_payload(
+            context,
+            entity_type,
+            canonical_id,
+            run_id=run_id,
+        )
 
     @router.get("/api/v2/execution-ledger/{correlation_id}")
     def execution_ledger(correlation_id: str, run_id: Optional[str] = Query(None)) -> Dict[str, Any]:

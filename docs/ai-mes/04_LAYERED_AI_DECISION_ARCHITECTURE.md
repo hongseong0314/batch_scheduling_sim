@@ -1,7 +1,17 @@
 # Layered AI Decision Architecture
 
-Status: canonical  
-Last updated: 2026-05-10
+Status: canonical
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: AI policy developers and backend developers implementing or
+reviewing L1/L2/L3/L4 behavior.
+
+Use this when deciding which layer owns a decision, what each layer may output,
+and how candidate evidence flows upward before execution intent flows downward.
+
+Read after: [03_ABC_CANONICAL_SCHEMA_REFERENCE.md](03_ABC_CANONICAL_SCHEMA_REFERENCE.md).
 
 ## Core Decision Model
 
@@ -21,6 +31,88 @@ L4 objective -> L3 selected group/stage -> L1 final allocation -> L2 final APC
 This is the central design. Any implementation that makes L3 or L4 directly
 choose task lists without L1 candidate support is crossing layer boundaries.
 
+## Why This Is A Manufacturing Decision Problem
+
+The target problem is not "find the best scheduler." The target problem is
+"compose a safe manufacturing decision from conflicting local, process,
+cross-stage, and business objectives."
+
+Modern semiconductor-style operations are moving toward tighter specifications,
+more product variants, smaller lots, and more frequent product changeovers.
+Those conditions reduce the slack that older manual rules or single-objective
+dispatch algorithms relied on. A rule that only maximizes utilization can
+increase setup instability or quality risk. A rule that only minimizes lateness
+can starve downstream WIP balance. A local packer can choose the best local
+material/color combination while ignoring customer priority or rework pressure.
+
+The layer split is the control mechanism for those tradeoffs:
+
+- L1 should say what is locally feasible and locally attractive.
+- L2 should say what recipe, equipment setup, DOE confidence, quality, and APC
+  risk attach to each feasible option.
+- L3 should compare those options across operations and decide which process,
+  group, or candidate should receive execution focus now.
+- L4 should set the current system objective and governance weights, such as
+  throughput, yield, tardiness, WIP balance, customer priority, cost, and safety.
+
+This structure preserves disagreement instead of flattening it. If L1 says Beta
+is locally better but L3/L4 choose Alpha because Alpha has higher due-date or
+customer-priority pressure, the system can show both truths and explain the
+final decision.
+
+![Four-layer AI MES decision architecture](assets/four-layer-decision-architecture-paper.png)
+
+The figure above is the decision philosophy in paper-diagram form. The left
+side is evidence generation: L1 exposes feasible local candidates and L2 adds
+process/APC implications. The center is the auditable portfolio and upper score
+decomposition. The right side is execution intent: L4/L3 choose the objective
+and selected focus, then L1/L2 finalize the concrete allocation and process
+fields before the Rule Engine can create a command or action proposal.
+
+![A/B/C process-layer AI MES architecture](assets/abc-process-layer-stack-paper.png)
+
+The second figure maps the same philosophy onto the current A -> B -> C line.
+Each process owns its own local L1 and L2 pair:
+
+- A owns batch dispatch plus recipe-sensitive QA/APC.
+- B owns cleaning dispatch plus solution/recipe risk.
+- C owns packing combination generation plus material/color quality scoring.
+
+L3 is intentionally drawn across A, B, and C because it is not a single-process
+scheduler. It compares the local portfolios from every process and selects the
+stage, group, candidate, and execution budget that best match the L4 objective.
+L4 sits above the line because its role is system objective and governance, not
+local scheduling.
+
+## Visual Flow
+
+```mermaid
+flowchart TD
+  State["Decision state"] --> L1Candidates["L1 local candidate portfolio"]
+  L1Candidates --> L2Annotations["L2 candidate annotations"]
+  L2Annotations --> L4Objective["L4 objective weights"]
+  L4Objective --> L3Selection["L3 stage / group / candidate selection"]
+  L3Selection --> L1Final["L1 final allocation"]
+  L1Final --> L2Final["L2 final APC / recipe"]
+  L2Final --> Rule["Rule Engine validation"]
+  Rule --> Command["MESCommand or ActionProposal"]
+
+  L1Candidates --> Portfolio["Portfolio snapshot"]
+  L2Annotations --> Portfolio
+  L3Selection --> Portfolio
+  Command --> Chain["Decision chain audit"]
+```
+
+For non-MES readers:
+
+- `WIP` means work currently waiting, running, held, or reworking.
+- `dispatch` means selecting which item or batch should run on which equipment.
+- `recipe` means an approved process parameter set.
+- `APC` means process-control logic that predicts or selects recipe, quality,
+  replacement, or maintenance context.
+- `candidate portfolio` means the full set of feasible local actions, including
+  rejected actions, not only the final selected action.
+
 ## Layer Responsibilities
 
 | Layer | Name | Question | Output |
@@ -31,6 +123,12 @@ choose task lists without L1 candidate support is crossing layer boundaries.
 | L4 | System objective | Which business/fab objective weights matter now? | Objective id, objective weights, override policy, and governance |
 
 ## C Packing Canonical Example
+
+The C packing example is intentionally compact. It shows why layered
+manufacturing decisions are necessary before the system expands to many real
+operations. Packing looks local, but the candidate space grows quickly and the
+right answer depends on product mix, material/color compatibility, setup
+stability, due-date pressure, customer priority, and fab-wide WIP state.
 
 For C packing, the final decision is:
 

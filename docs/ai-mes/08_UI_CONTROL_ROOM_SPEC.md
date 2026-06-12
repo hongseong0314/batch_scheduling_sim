@@ -1,7 +1,17 @@
 # UI Control Room Specification
 
-Status: canonical  
-Last updated: 2026-05-15
+Status: canonical
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: UI developers, product designers, and backend developers
+building payloads for the control room.
+
+Use this when changing `/mes`, adding a page, altering a table, or deciding how
+operators and AI developers should inspect decisions.
+
+Read after: [07_API_CONTRACTS.md](07_API_CONTRACTS.md).
 
 ## Purpose
 
@@ -18,6 +28,40 @@ AI MES. It must help dispatchers, engineers, and AI developers understand:
 
 The UI must never imply that AI directly executes equipment commands.
 
+The UI must also make manufacturing tradeoffs visible. The user should be able
+to see when a locally strong candidate lost because L3/L4 selected a different
+manufacturing objective, such as due-date pressure, WIP balance, customer
+priority, or quality/setup risk.
+
+## Information Architecture
+
+```mermaid
+flowchart TD
+  Shell["/mes product shell"] --> Operate["Operate"]
+  Shell --> Trace["Trace"]
+  Shell --> AI["AI Development"]
+  Shell --> Audit["System / Audit"]
+
+  Operate --> Fab["Fab Control"]
+  Operate --> Gantt["Flow & Gantt"]
+  Operate --> Equipment["Equipment"]
+  Operate --> Detail["Machine Detail"]
+
+  Trace --> Chain["Decision Chain"]
+  Trace --> Assignment["Assignment Trace"]
+  Trace --> Genealogy["Genealogy"]
+  Trace --> Portfolio["Candidate Portfolio"]
+
+  AI --> Chat["Process Chat"]
+  AI --> DevConsole["AI Dev Console"]
+
+  Audit --> Events["Events"]
+```
+
+The UI separates operational views from developer/debug views. Operators should
+see status, WIP, equipment, and safe proposals. AI developers should see policy
+ids, candidate portfolios, scores, traces, and tool calls.
+
 ## Product Shell Direction
 
 The UI is now treated as the product shell for a Semiconductor Digital Twin MES.
@@ -33,6 +77,10 @@ redesign.
 `https://github.com/nexu-io/open-design` is used only as a design-system
 reference for enterprise token discipline and product-console patterns. It is
 not a runtime dependency.
+
+The previous Product UI Foundation V1 planning note has been archived at
+[archive/08_PRODUCT_UI_FOUNDATION_V1.md](archive/08_PRODUCT_UI_FOUNDATION_V1.md).
+This file is the active UI source of truth.
 
 | Group | Screens | Primary question |
 |---|---|---|

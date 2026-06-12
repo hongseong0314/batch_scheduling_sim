@@ -230,3 +230,49 @@ def test_production_readiness_api_reports_storage_boundaries_and_health() -> Non
     assert body["boundaries"]["direct_equipment_control"] is False
     assert "canonical_ingestion_records" in body["storage"]["tables"]
     assert "llm_write_tools_default" in body["security"]
+    assert body["integration_points"]["production_schema"] == "/api/v2/production/schema"
+    assert body["integration_points"]["data_quality"] == "/api/v2/production/data-quality"
+
+
+def test_production_schema_api_exposes_canonical_contract() -> None:
+    response = client.get("/api/v2/production/schema")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["schema_version"] == "canonical-production-data-v1"
+    assert body["status"] == "POSTGRESQL_READY_CONTRACT_DRAFT"
+    assert body["tables"]["units"]["primary_key"] == "unit_id"
+    assert "canonical_ingestion_records" in body["current_mvp_backend"]["tables"]
+    assert "source_key_mapping_index" in body["current_mvp_backend"]["normalized_indexes"]
+    assert "Event time, ingest time, and decision time are stored separately." in body["invariants"]
+
+
+def test_production_data_quality_reports_source_key_conflict() -> None:
+    client.post("/api/v2/simulation/reset")
+    for canonical_id in ("WAFER_ALPHA", "WAFER_BETA"):
+        response = client.post(
+            "/api/v2/source-key-mappings",
+            json={
+                "mapping_id": f"SKM_CONFLICT_{canonical_id}",
+                "source_system": "LEGACY_MES",
+                "source_table": "WIP_UNIT",
+                "source_pk": "SRC_WAFER_1",
+                "entity_type": "UNIT",
+                "canonical_id": canonical_id,
+                "event_time": 1,
+                "ingest_time": 2,
+            },
+        )
+        assert response.status_code == 200
+
+    response = client.get("/api/v2/production/data-quality")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["schema_version"] == "canonical-production-data-v1"
+    assert body["status"] == "ERROR"
+    assert body["counts"]["source_key_mappings"] == 2
+    assert any(
+        issue["code"] == "SOURCE_KEY_CANONICAL_CONFLICT"
+        for issue in body["issues"]
+    )

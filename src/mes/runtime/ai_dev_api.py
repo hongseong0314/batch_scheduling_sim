@@ -21,6 +21,10 @@ from src.mes.runtime.experiments import (
     list_scenarios,
     run_experiment,
 )
+from src.mes.runtime.policy_platform import (
+    decision_dataset_payload,
+    policy_evaluation_summary_payload,
+)
 
 
 def build_ai_dev_router(context: Any) -> APIRouter:
@@ -37,6 +41,19 @@ def build_ai_dev_router(context: Any) -> APIRouter:
     @router.get("/api/v2/ai-dev/candidate-portfolio/{correlation_id}")
     def ai_dev_portfolio(correlation_id: str) -> Dict[str, Any]:
         return ai_dev_candidate_portfolio(context, correlation_id)
+
+    @router.get("/api/v2/ai-dev/decision-dataset")
+    def ai_dev_decision_dataset(
+        limit: int = Query(200, ge=1, le=1000),
+        run_id: str | None = Query(None),
+    ) -> Dict[str, Any]:
+        return decision_dataset_payload(context, limit=limit, run_id=run_id)
+
+    @router.get("/api/v2/ai-dev/policy-evaluation-summary")
+    def ai_dev_policy_evaluation_summary(
+        run_id: str | None = Query(None),
+    ) -> Dict[str, Any]:
+        return policy_evaluation_summary_payload(context, run_id=run_id)
 
     @router.post("/api/v2/ai-dev/scenarios/capture")
     def ai_dev_capture_scenario() -> Dict[str, Any]:

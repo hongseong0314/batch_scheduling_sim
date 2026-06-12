@@ -10,7 +10,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from src.mes.action_proposals import LegacyDecision, OutcomeRecord
+from src.mes.action_proposals import (
+    ActionProposalReview,
+    LegacyDecision,
+    OutcomeRecord,
+)
 from src.mes.adapters import wafer_id_from_task_uid
 from src.mes.domain import (
     AIRecommendation,
@@ -65,6 +69,7 @@ class InMemoryMESStore:
         self._equipment: Dict[str, Equipment] = {}
         self._recipes: Dict[str, Recipe] = {}
         self._source_key_mappings: Dict[str, SourceKeyMapping] = {}
+        self._action_proposal_reviews: Dict[str, ActionProposalReview] = {}
         self._legacy_decisions: Dict[str, LegacyDecision] = {}
         self._outcome_records: Dict[str, OutcomeRecord] = {}
         self._raw_source_records: Dict[str, RawSourceRecord] = {}
@@ -130,7 +135,8 @@ class InMemoryMESStore:
             "genealogy_edge_index": 0,
             "source_key_mapping_index": len(self.source_key_mappings(run_id=run_id)),
             "proposal_lifecycle_index": (
-                len(self.legacy_decisions(run_id=run_id))
+                len(self.action_proposal_reviews(run_id=run_id))
+                + len(self.legacy_decisions(run_id=run_id))
                 + len(self.outcome_records(run_id=run_id))
             ),
             "raw_source_record_index": len(self.raw_source_records(run_id=run_id)),
@@ -186,6 +192,20 @@ class InMemoryMESStore:
             return [mapping.to_dict() for mapping in self.source_key_mappings(run_id=run_id)[-limit:]]
         if name == "proposal_lifecycle_index":
             rows = []
+            for review in self.action_proposal_reviews(run_id=run_id):
+                payload = review.to_dict()
+                rows.append(
+                    {
+                        "run_id": review.run_id,
+                        "proposal_id": review.proposal_id,
+                        "record_type": "REVIEW",
+                        "record_id": review.review_id,
+                        "correlation_id": review.correlation_id,
+                        "status": review.review_status,
+                        "event_time": review.reviewed_at,
+                        "payload": payload,
+                    }
+                )
             for decision in self.legacy_decisions(run_id=run_id):
                 payload = decision.to_dict()
                 rows.append(
@@ -330,6 +350,12 @@ class InMemoryMESStore:
         self._ensure_run_id(mapping)
         self._source_key_mappings[mapping.mapping_id] = mapping
 
+    def add_action_proposal_review(self, review: ActionProposalReview) -> None:
+        self._ensure_run_id(review)
+        if not review.review_id:
+            review.review_id = make_id("APR")
+        self._action_proposal_reviews[review.review_id] = review
+
     def add_legacy_decision(self, decision: LegacyDecision) -> None:
         self._ensure_run_id(decision)
         if not decision.decision_id:
@@ -395,6 +421,27 @@ class InMemoryMESStore:
         if run_id is not None:
             matches = [mapping for mapping in matches if mapping.run_id == run_id]
         return matches[-1] if matches else None
+
+    def action_proposal_reviews(
+        self,
+        proposal_id: Optional[str] = None,
+        review_status: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> List[ActionProposalReview]:
+        reviews = list(self._action_proposal_reviews.values())
+        if proposal_id is not None:
+            reviews = [
+                review for review in reviews if review.proposal_id == proposal_id
+            ]
+        if review_status is not None:
+            reviews = [
+                review
+                for review in reviews
+                if review.review_status == review_status
+            ]
+        if run_id is not None:
+            reviews = [review for review in reviews if review.run_id == run_id]
+        return reviews
 
     def legacy_decisions(
         self,
@@ -518,6 +565,7 @@ class InMemoryMESStore:
         self._commands.clear()
         self._events.clear()
         self._source_key_mappings.clear()
+        self._action_proposal_reviews.clear()
         self._legacy_decisions.clear()
         self._outcome_records.clear()
         self._raw_source_records.clear()

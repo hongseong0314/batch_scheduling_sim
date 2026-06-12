@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from src.mes.action_proposals import action_proposal_from_command
 from src.mes.digital_twin import (
     build_canonical_decision_state,
     build_digital_twin_state,
+)
+from src.mes.production_data import (
+    canonical_record_matches_entity,
+    data_quality_diagnostics,
 )
 from src.mes.recommendations import make_id
 from src.mes.runtime.common import normalize_target_stage
@@ -22,12 +26,19 @@ def canonical_twin_state_payload(
     resolved_run_id = _resolved_run_id(context, run_id)
     records = context.harness.store.canonical_ingestion_records(run_id=resolved_run_id)
     state = build_digital_twin_state(records, at_time=at_time)
+    diagnostics = _canonical_diagnostics(
+        context,
+        resolved_run_id,
+        state,
+        at_time=at_time,
+    )
     return {
         "source": "canonical_ingestion",
         "state_source": "CANONICAL_TWIN",
         "run_id": resolved_run_id,
         "at_time": at_time,
         "record_count": len(records),
+        "diagnostics": diagnostics,
         "state": state,
     }
 
@@ -45,6 +56,7 @@ def canonical_decision_state_payload(
         "run_id": twin_payload["run_id"],
         "at_time": at_time,
         "record_count": twin_payload["record_count"],
+        "diagnostics": twin_payload["diagnostics"],
         "decision_state": decision_state,
     }
 
@@ -79,6 +91,7 @@ def canonical_candidate_preview_payload(
         "stage": target_stage,
         "candidate_count": len(candidates),
         "items": candidates,
+        "diagnostics": decision_payload["diagnostics"],
         "decision_state_summary": _decision_state_summary(decision_state),
     }
 
@@ -105,7 +118,10 @@ def run_canonical_recommendation_payload(
     command = result.command
     if command is not None:
         command.validated_command.setdefault("state_source", "CANONICAL_TWIN")
-        command.validated_command.setdefault("production_recommendation_mode", "CANONICAL_TWIN_PREVIEW")
+        command.validated_command.setdefault(
+            "production_recommendation_mode",
+            "CANONICAL_TWIN_PREVIEW",
+        )
         context.harness.store.add_command(command)
         proposal = action_proposal_from_command(
             command,
@@ -121,6 +137,7 @@ def run_canonical_recommendation_payload(
         "correlation_id": correlation_id,
         "target_stage": target_stage,
         "record_count": decision_payload["record_count"],
+        "diagnostics": decision_payload["diagnostics"],
         "result": {
             "passed": result.passed,
             "status": result.evaluation.status,
@@ -135,8 +152,94 @@ def run_canonical_recommendation_payload(
     }
 
 
+def canonical_genealogy_payload(
+    context: Any,
+    entity_type: str,
+    canonical_id: str,
+    run_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    resolved_run_id = _resolved_run_id(context, run_id)
+    target_type = str(entity_type).upper()
+    target_id = str(canonical_id)
+    records = [
+        record
+        for record in context.harness.store.canonical_ingestion_records(
+            run_id=resolved_run_id
+        )
+        if canonical_record_matches_entity(record, target_type, target_id)
+    ]
+    records = sorted(
+        records,
+        key=lambda item: (
+            int(
+                item.event_time
+                if item.event_time is not None
+                else item.ingest_time or 0
+            ),
+            str(item.record_id),
+        ),
+    )
+    raw_by_id = {
+        record.record_id: record
+        for record in context.harness.store.raw_source_records(run_id=resolved_run_id)
+    }
+    raw_evidence = []
+    seen_raw_ids = set()
+    for record in records:
+        raw_record = raw_by_id.get(record.raw_record_id)
+        if raw_record is None or raw_record.record_id in seen_raw_ids:
+            continue
+        seen_raw_ids.add(raw_record.record_id)
+        raw_evidence.append(raw_record.to_dict())
+    diagnostics = _canonical_diagnostics(
+        context,
+        resolved_run_id,
+        {
+            "diagnostics": {
+                "status": "EMPTY" if not records else "OK",
+                "issue_count": 0,
+                "issues": [],
+            }
+        },
+    )
+    if not records:
+        diagnostics = {
+            **diagnostics,
+            "genealogy": {
+                "status": "NOT_FOUND",
+                "issues": [
+                    {
+                        "severity": "WARN",
+                        "code": "CANONICAL_ENTITY_NOT_FOUND",
+                        "message": "No canonical ingestion records matched the requested entity.",
+                    }
+                ],
+            },
+        }
+    return {
+        "found": bool(records),
+        "state_source": "CANONICAL_TWIN",
+        "run_id": resolved_run_id,
+        "entity_type": target_type,
+        "canonical_id": target_id,
+        "record_count": len(records),
+        "raw_evidence_count": len(raw_evidence),
+        "timeline": [
+            _genealogy_timeline_row(record, raw_by_id.get(record.raw_record_id))
+            for record in records
+        ],
+        "raw_evidence": raw_evidence,
+        "related_entities": _related_entities(records),
+        "diagnostics": diagnostics,
+    }
+
+
 def _resolved_run_id(context: Any, run_id: Optional[str]) -> str:
-    return str(run_id or getattr(context, "run_id", "") or context.harness.store.current_run_id)
+    return str(
+        run_id
+        or getattr(context, "run_id", "")
+        or context.harness.store.current_run_id
+    )
 
 
 def _decision_state_summary(decision_state: Dict[str, Any]) -> Dict[str, Any]:
@@ -155,3 +258,67 @@ def _decision_state_summary(decision_state: Dict[str, Any]) -> Dict[str, Any]:
         "task_count": len(decision_state.get("tasks", {}) or {}),
         "stages": stages,
     }
+
+
+def _canonical_diagnostics(
+    context: Any,
+    run_id: str,
+    state: Dict[str, Any],
+    at_time: Optional[int] = None,
+) -> Dict[str, Any]:
+    registry = getattr(context, "operation_registry", None)
+    operation_ids = registry.operation_ids() if registry is not None else []
+    return {
+        "twin": dict(state.get("diagnostics") or {}),
+        "data_quality": data_quality_diagnostics(
+            context.harness.store.raw_source_records(run_id=run_id),
+            context.harness.store.canonical_ingestion_records(run_id=run_id),
+            context.harness.store.source_key_mappings(run_id=run_id),
+            operation_ids=operation_ids,
+            at_time=at_time,
+        ),
+    }
+
+
+def _genealogy_timeline_row(record: Any, raw_record: Any) -> Dict[str, Any]:
+    return {
+        "record_id": record.record_id,
+        "raw_record_id": record.raw_record_id,
+        "raw_source_key": raw_record.source_key if raw_record is not None else "",
+        "entity_type": record.entity_type,
+        "canonical_id": record.canonical_id,
+        "event_type": record.event_type,
+        "operation_id": record.operation_id,
+        "equipment_id": record.equipment_id,
+        "lot_id": record.lot_id,
+        "unit_id": record.unit_id,
+        "recipe_id": record.recipe_id,
+        "event_time": record.event_time,
+        "ingest_time": record.ingest_time,
+        "decision_time": record.decision_time,
+        "attributes": dict(record.attributes or {}),
+        "measurements": dict(record.measurements or {}),
+        "quality_result": dict(record.quality_result or {}),
+    }
+
+
+def _related_entities(records: List[Any]) -> Dict[str, List[str]]:
+    related = {
+        "lot_ids": set(),
+        "unit_ids": set(),
+        "equipment_ids": set(),
+        "recipe_ids": set(),
+        "operation_ids": set(),
+    }
+    for record in records:
+        if record.lot_id:
+            related["lot_ids"].add(str(record.lot_id))
+        if record.unit_id:
+            related["unit_ids"].add(str(record.unit_id))
+        if record.equipment_id:
+            related["equipment_ids"].add(str(record.equipment_id))
+        if record.recipe_id:
+            related["recipe_ids"].add(str(record.recipe_id))
+        if record.operation_id:
+            related["operation_ids"].add(str(record.operation_id))
+    return {key: sorted(values) for key, values in related.items()}

@@ -71,6 +71,12 @@ def build_digital_twin_state(
             _apply_assignment_record(units, equipment, record)
 
     _ensure_equipment_batches(equipment, units)
+    diagnostics = _twin_diagnostics(
+        ordered,
+        units=units,
+        equipment=equipment,
+        at_time=at_time,
+    )
     return {
         "state_source": "CANONICAL_TWIN",
         "time": int(at_time if at_time is not None else latest_time),
@@ -82,6 +88,7 @@ def build_digital_twin_state(
         "equipment": equipment,
         "quality_results": quality_results,
         "wip_by_operation": _wip_by_operation(units),
+        "diagnostics": diagnostics,
     }
 
 
@@ -451,6 +458,90 @@ def _operation_ids_from_twin(twin_state: Dict[str, Any]) -> List[str]:
         if machine.get("operation_id"):
             operations.add(str(machine["operation_id"]))
     return sorted(operations)
+
+
+def _twin_diagnostics(
+    records: List[CanonicalIngestionRecord],
+    units: Dict[int, Dict[str, Any]],
+    equipment: Dict[str, Dict[str, Any]],
+    at_time: Optional[int],
+) -> Dict[str, Any]:
+    issues: List[Dict[str, Any]] = []
+    supported = {
+        "LOT",
+        "UNIT",
+        "WAFER",
+        "EQUIPMENT",
+        "RECIPE",
+        "EVENT",
+        "ASSIGNMENT",
+        "QUALITY",
+    }
+    for record in records:
+        entity_type = str(record.entity_type or "").upper()
+        if entity_type not in supported:
+            issues.append(
+                {
+                    "severity": "WARN",
+                    "code": "UNSUPPORTED_ENTITY_SKIPPED",
+                    "record_id": record.record_id,
+                    "entity_type": record.entity_type,
+                    "message": "Digital twin replay skipped an unsupported entity type.",
+                }
+            )
+        if (
+            entity_type in {"UNIT", "WAFER", "ASSIGNMENT", "QUALITY"}
+            and not record.operation_id
+        ):
+            issues.append(
+                {
+                    "severity": "WARN",
+                    "code": "MISSING_OPERATION_ID",
+                    "record_id": record.record_id,
+                    "entity_type": entity_type,
+                    "message": "Record can be replayed, but policy routing may be incomplete.",
+                }
+            )
+    for uid, row in sorted(units.items()):
+        if row.get("status") == "RUNNING" and not row.get("equipment_id"):
+            issues.append(
+                {
+                    "severity": "WARN",
+                    "code": "RUNNING_UNIT_WITHOUT_EQUIPMENT",
+                    "unit_uid": uid,
+                    "message": "Running unit has no equipment_id in canonical state.",
+                }
+            )
+    for equipment_id, machine in sorted(equipment.items()):
+        if machine.get("status") == "busy" and not machine.get("current_batch_uids"):
+            issues.append(
+                {
+                    "severity": "WARN",
+                    "code": "BUSY_EQUIPMENT_WITHOUT_BATCH",
+                    "equipment_id": equipment_id,
+                    "message": "Busy equipment has no current_batch_uids after replay.",
+                }
+            )
+    severities = {issue["severity"] for issue in issues}
+    status = "WARN" if "WARN" in severities else "OK"
+    if not records:
+        status = "EMPTY"
+    return {
+        "status": status,
+        "at_time": at_time,
+        "record_count": len(records),
+        "unit_count": len(units),
+        "equipment_count": len(equipment),
+        "operation_ids": _operation_ids_from_twin(
+            {
+                "units": units,
+                "equipment": equipment,
+                "wip_by_operation": _wip_by_operation(units),
+            }
+        ),
+        "issue_count": len(issues),
+        "issues": issues,
+    }
 
 
 def _completed_count(twin_state: Dict[str, Any]) -> int:

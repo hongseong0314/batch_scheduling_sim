@@ -1,7 +1,18 @@
 # Process APC MCP Agent V1
 
-Status: implemented V1  
-Last updated: 2026-05-22
+Status: implemented V1
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: agent developers, process engineers, and developers extending
+read-only MES/APC tools for LLM use.
+
+Use this when configuring chat models, adding a process tool, changing Agent
+Mode, or validating the read-only boundary for natural-language APC questions.
+
+Read after: [03_ABC_CANONICAL_SCHEMA_REFERENCE.md](03_ABC_CANONICAL_SCHEMA_REFERENCE.md)
+and [07_API_CONTRACTS.md](07_API_CONTRACTS.md).
 
 ## Purpose
 
@@ -67,6 +78,27 @@ The `openai` provider also covers OpenAI-compatible gateways when they expose
 
 The runtime config lives at `config/mes-process-agent.yaml`. A documentation
 copy remains at `docs/ai-mes/examples/mes-process-agent.yaml`.
+
+## Provider And Tool Boundary
+
+```mermaid
+flowchart TD
+  User["process engineer question"] --> ChatUI["/mes#chat"]
+  ChatUI --> ModelConfig["Continue-style model config"]
+  ModelConfig --> Provider["Ollama or OpenAI-compatible provider"]
+  Provider --> AgentLoop["agent loop"]
+  AgentLoop --> Registry["read-only MES tool registry"]
+  Registry --> APC["A/B/C APC and policy tools"]
+  Registry --> Runtime["fab state / policy / trace tools"]
+  APC --> ToolResult["structured tool result"]
+  Runtime --> ToolResult
+  ToolResult --> AgentLoop
+  AgentLoop --> Answer["engineer-facing answer"]
+```
+
+The model is not the source of manufacturing truth. It can reason over natural
+language, but every process-specific number must come from an explicit read-only
+tool result or from clearly stated user-provided input.
 
 Compatibility details:
 
@@ -166,7 +198,7 @@ chat service is running inside the MES API process:
 - `get_assignment_trace`
 
 Agent Mode also exposes the A/B/C layered process tools documented in
-`16_ABC_CANONICAL_SCHEMA_REFERENCE.md`.
+`03_ABC_CANONICAL_SCHEMA_REFERENCE.md`.
 
 L1 candidate tools:
 
@@ -272,6 +304,38 @@ opens `/mes#chat` and renders:
 The AI Developer Console also includes Agent Run Inspector. It lists recent
 agent runs from `/api/v2/agent-runs`, lets developers select one run, and shows
 the final answer, metadata, tool calls, and step timeline.
+
+## Agent Tool Flow
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant UI as "MES Chat UI"
+  participant Agent as "Agent loop"
+  participant Model as "Configured LLM"
+  participant Gate as "Read-only tool policy"
+  participant Runtime as "MES runtime tools"
+  participant APC as "A/B/C process tools"
+  participant Store as "Agent run store"
+
+  User->>UI: Ask process or MES question
+  UI->>Agent: model, mode, max_steps, message
+  Agent->>Model: system prompt plus tool schemas
+  Model-->>Agent: tool calls or final answer
+  Agent->>Gate: validate requested tools
+  Gate->>Runtime: inspect fab, policy, trace, equipment
+  Gate->>APC: predict or annotate process candidates
+  Runtime-->>Agent: structured tool result
+  APC-->>Agent: structured tool result
+  Agent->>Model: append tool evidence
+  Model-->>Agent: final explanation
+  Agent->>Store: persist run, tool calls, step trace
+  Agent-->>UI: answer and compact trace
+```
+
+Tool execution is deliberately narrower than a general coding agent. The MES
+agent can inspect state and run process models, but V1 cannot write MES records,
+apply recipes, dispatch lots, or execute equipment commands.
 
 ## Process And Equipment Display Names
 

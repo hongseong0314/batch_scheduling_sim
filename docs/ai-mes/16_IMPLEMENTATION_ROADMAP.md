@@ -1,7 +1,18 @@
 # Implementation Roadmap
 
-Status: canonical  
-Last updated: 2026-05-25
+Status: canonical
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: project planners and implementation leads coordinating future
+work across policy, runtime, UI, ingestion, and deployment hardening.
+
+Use this when selecting the next development phase, checking acceptance
+criteria, or deciding where a new requirement belongs.
+
+Read after: [15_PRODUCTION_MES_V1_GOALS.md](15_PRODUCTION_MES_V1_GOALS.md) and
+[17_CURRENT_IMPLEMENTATION_STATUS.md](17_CURRENT_IMPLEMENTATION_STATUS.md).
 
 ## Guiding Principle
 
@@ -9,6 +20,34 @@ Do not replace the working simulator. Add layered MES policy contracts around it
 
 Existing tests and simulator research flows should continue to pass while the
 MES path evolves.
+
+Roadmap phase numbers preserve the historical build sequence. For new planning,
+use [17_CURRENT_IMPLEMENTATION_STATUS.md](17_CURRENT_IMPLEMENTATION_STATUS.md)
+to understand what exists today, then use the "Next Priorities" section below
+to choose the next production-readiness slice.
+
+## Roadmap Dependency Map
+
+```mermaid
+flowchart TD
+  Docs["Phase 0 docs and alignment"] --> Portfolio["Phase 1 L1 portfolio"]
+  Portfolio --> Annotation["Phase 2 L2 annotation"]
+  Annotation --> L3L4["Phase 3 L3/L4 selection"]
+  L3L4 --> Harness["Phase 4 harness refactor"]
+  Harness --> Rule["Phase 5 Rule Engine gate"]
+  Rule --> API["Phase 6 API expansion"]
+  API --> UI["Phase 7 UI traceability"]
+  UI --> Persistence["Phase 8 persistence/genealogy"]
+  Persistence --> Registry["Phase 8.5 operation registry/action proposal"]
+  Registry --> Keys["Phase 8.6 source key mapping"]
+  Keys --> Ingestion["Phase 8C legacy ingestion"]
+  Ingestion --> Twin["Phase 8D production digital twin"]
+  Twin --> Operator["Phase 9 operator workflow and production boundary"]
+```
+
+The roadmap is intentionally cumulative. Later production work depends on the
+same portfolio, annotation, Rule Engine, and traceability contracts built for
+the simulator.
 
 ## Phase 0: Documentation And Alignment
 
@@ -320,9 +359,9 @@ Follow-on deliverables:
 
 - canonical ingestion records are handled by Phase 8C below,
 - source-specific ingestion adapters,
-- conflict review for one source key mapping to multiple canonical ids,
+- conflict review workflow for one source key mapping to multiple canonical ids,
 - production PostgreSQL DDL and migration scripts,
-- source-system data quality diagnostics.
+- source-system data quality dashboard.
 
 ## Phase 8C: Legacy Ingestion Contract V1
 
@@ -337,7 +376,7 @@ Deliverables:
 - `GET /api/v2/ingestion/source-records` list API,
 - `GET /api/v2/ingestion/canonical-records` list API,
 - automatic SourceKeyMapping upsert when `canonical_id` is present,
-- canonical documentation in `13_LEGACY_INGESTION_CONTRACT.md`.
+- canonical documentation in `12_LEGACY_INGESTION_CONTRACT.md`.
 
 Acceptance:
 
@@ -353,11 +392,12 @@ Future deliverables:
 - event-sourced WIP reconstruction from canonical ingestion records,
 - conflict review workflow for mapping collisions,
 - production PostgreSQL DDL and migration scripts,
-- source-system data quality diagnostics.
+- source-system data quality dashboard and alerting.
 
 ## Phase 8D: Production Digital Twin Backbone V1
 
-Status: implemented for canonical replay and L1 candidate preview.
+Status: implemented for canonical replay, diagnostics, genealogy, candidate
+preview, and production-safe recommendation run.
 
 Deliverables:
 
@@ -367,12 +407,20 @@ Deliverables:
   - `GET /api/v2/digital-twin/canonical-state`,
   - `GET /api/v2/digital-twin/canonical-decision-state`,
   - `GET /api/v2/digital-twin/candidate-preview`,
+  - `POST /api/v2/digital-twin/recommendation-run`,
+  - `GET /api/v2/production/schema`,
+  - `GET /api/v2/production/data-quality`,
+  - `GET /api/v2/genealogy/canonical/{entity_type}/{canonical_id}`,
 - supported canonical event semantics for wait/running/rework/hold/completed
   unit state and equipment availability,
 - production `CANONICAL_TWIN` state source marker,
 - policy-compatible decision-state builder,
 - L1 candidate portfolio preview from canonical state,
-- canonical documentation in `14_PRODUCTION_DIGITAL_TWIN_BACKBONE.md`.
+- full L4 -> L3 -> L1 -> L2 -> Rule Engine -> Action Proposal run from
+  canonical state,
+- twin replay diagnostics and production data quality diagnostics,
+- canonical entity genealogy linked to raw source evidence,
+- canonical documentation in `13_PRODUCTION_DIGITAL_TWIN_BACKBONE.md`.
 
 Acceptance:
 
@@ -382,16 +430,70 @@ Acceptance:
 - policy-ready state has the same `tasks`, stage queues, and machine shape as
   simulator state,
 - candidate preview generates L1 candidates from canonical state without
-  mutating simulator state.
+  mutating simulator state,
+- recommendation run returns an `ActionProposal` with
+  `direct_equipment_control=false`,
+- data-quality diagnostics flag source-key conflicts and missing source
+  evidence,
+- canonical genealogy can explain which raw/canonical records produced a unit,
+  lot, equipment, recipe, assignment, or quality entity.
 
 Future deliverables:
 
-- full L4 -> L3 -> L1 -> L2 -> Rule Engine -> Action Proposal preview from
-  canonical twin state,
 - source-specific adapter packages for MES/FDC/RMS/ERP event vocabularies,
 - out-of-order event conflict diagnostics,
 - production PostgreSQL event store,
 - WIP reconstruction freshness and data-quality monitoring.
+
+## Phase 8E: Decision And Policy Platform V1
+
+Status: implemented for audit-backed decision dataset export and policy
+evaluation summary.
+
+Deliverables:
+
+- `GET /api/v2/ai-dev/decision-dataset`,
+- `GET /api/v2/ai-dev/policy-evaluation-summary`,
+- decision rows joining portfolio, selected candidate, policy ids, validation,
+  command, action proposal, workflow state, and learning label,
+- policy summary counts for validation statuses, workflow states, selected
+  stages, experiments, and learning-ready rows.
+
+Acceptance:
+
+- every stored portfolio cycle can be inspected as a future policy-training row,
+- rows distinguish simulator state from `CANONICAL_TWIN` state,
+- rows do not require a learning model to be present,
+- policy-evaluation summary reports what evidence is ready and what is still
+  missing.
+
+## Phase 8F: Safe Action Proposal Workflow V1
+
+Status: implemented for review-gated proposal workflow before legacy
+submission.
+
+Deliverables:
+
+- `ActionProposalReview` DTO,
+- in-memory and SQLite persistence for review records,
+- review records indexed in `proposal_lifecycle_index`,
+- `GET /api/v2/action-proposals/approval-queue`,
+- `POST /api/v2/action-proposals/{proposal_id}/reviews`,
+- `GET /api/v2/action-proposals/{proposal_id}/workflow`,
+- workflow states:
+  - `PENDING_REVIEW`,
+  - `APPROVED_FOR_LEGACY_SUBMISSION`,
+  - `REJECTED_BY_REVIEW`,
+  - `NEEDS_CHANGES`,
+  - `LEGACY_*`,
+  - `OUTCOME_RECORDED`.
+
+Acceptance:
+
+- generated proposals are not safe to submit until approved,
+- approval does not imply direct equipment control,
+- legacy decision/outcome records remain separate from operator review,
+- approval queue exposes the current workflow state for each proposal.
 
 ## Next Priorities
 
@@ -400,7 +502,7 @@ Recommended next build order:
 1. Source adapter scheduling/backfill jobs for MES/FDC/RMS/ERP ingestion.
 2. Production PostgreSQL schema and migrations for canonical/event/proposal
    records.
-3. Auth, roles, and operator approval queue for write-capable workflows.
+3. Auth, roles, and production outbox submission for write-capable workflows.
 4. Full source-data quality dashboard for duplicate, late, missing, and
    conflicting events.
 5. Extend read-only Agent Mode tools from Process A APC to Process B APC and C

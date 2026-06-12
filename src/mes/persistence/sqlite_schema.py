@@ -11,6 +11,7 @@ TABLES = {
     "equipment": "equipment_id",
     "recipes": "recipe_id",
     "source_key_mappings": "mapping_id",
+    "action_proposal_reviews": "review_id",
     "legacy_decisions": "decision_id",
     "outcome_records": "outcome_id",
     "raw_source_records": "record_id",

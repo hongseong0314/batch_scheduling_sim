@@ -1,7 +1,17 @@
 # Legacy Ingestion Contract
 
-Status: canonical production-transition specification  
-Last updated: 2026-05-25
+Status: canonical production-transition specification
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: ingestion engineers and data platform developers building the
+bridge from legacy source rows into policy-ready AI MES state.
+
+Use this when defining RawSourceRecord, CanonicalIngestionRecord, adapter
+outputs, or event-time versus ingest-time behavior.
+
+Read after: [11_LEGACY_SOURCE_KEY_MAPPING.md](11_LEGACY_SOURCE_KEY_MAPPING.md).
 
 ## Purpose
 
@@ -17,6 +27,24 @@ raw source row/event -> canonical AI MES record
 
 The raw record is kept as audit evidence. The canonical record is what decision
 state builders, genealogy, KPI evaluation, and future policy training consume.
+
+## Ingestion Pipeline Flow
+
+```mermaid
+flowchart TD
+  SourceRow["legacy row/event"] --> Raw["RawSourceRecord"]
+  Raw --> Adapter["source-specific adapter"]
+  Adapter --> Mapping["SourceKeyMapping"]
+  Adapter --> Canon["CanonicalIngestionRecord"]
+  Mapping --> Canon
+  Canon --> DQ["data-quality diagnostics"]
+  Canon --> Twin["digital twin replay"]
+  Twin --> DecisionState["policy-ready decision_state"]
+  DecisionState --> Trace["trace / KPI / policy evaluation"]
+```
+
+Raw records preserve evidence. Canonical records provide a consistent shape for
+the digital twin, traceability, KPI reconstruction, and future learning data.
 
 ## Records
 
@@ -126,6 +154,23 @@ GET /api/v2/ledger-index/raw_source_record_index
 GET /api/v2/ledger-index/canonical_ingestion_index
 ```
 
+Inspect whether the ingested records are safe for policy use:
+
+```http
+GET /api/v2/production/data-quality
+```
+
+The diagnostics endpoint does not automatically repair data. It flags issues
+that integration engineers must resolve before treating production-shaped data
+as high-trust policy input:
+
+- one source key mapped to multiple canonical ids,
+- canonical record without a raw evidence reference,
+- canonical record that references a missing raw source record,
+- unsupported entity type,
+- missing `operation_id`,
+- event-time/ingest-time inconsistencies.
+
 ## Source Key Mapping Link
 
 When `canonical_id` is supplied, ingestion also upserts a `SourceKeyMapping`.
@@ -146,10 +191,11 @@ evidence is still preserved.
 V1 intentionally does not:
 
 - mutate simulator state from production rows,
-- implement source-specific MES/FDC/RMS adapters,
+- implement all source-specific MES/FDC/RMS/ERP adapters,
 - infer schemas automatically,
-- resolve conflicting source-key mappings,
+- automatically resolve conflicting source-key mappings,
 - replace production MES scheduling or equipment-control engines.
 
-The next production step is building an event-sourced WIP reconstruction layer
-on top of these canonical records.
+The current production-twin path can replay these records into policy-ready
+state. The next production step is scheduled ingestion/backfill, production
+PostgreSQL migrations, and operational data-quality review workflows.

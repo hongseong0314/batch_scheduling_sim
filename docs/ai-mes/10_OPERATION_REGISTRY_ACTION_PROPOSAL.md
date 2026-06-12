@@ -1,7 +1,18 @@
 # Operation Registry And Action Proposal
 
-Status: canonical production-transition specification  
-Last updated: 2026-05-25
+Status: canonical production-transition specification
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: production integration engineers and backend developers
+generalizing beyond the current A/B/C simulator stages.
+
+Use this when adding operations, equipment metadata, route graph fields,
+display names, or the legacy-safe action proposal boundary.
+
+Read after: [02_SYSTEM_VISION.md](02_SYSTEM_VISION.md) and
+[05_RUNTIME_HARNESS_RULE_ENGINE.md](05_RUNTIME_HARNESS_RULE_ENGINE.md).
 
 ## Purpose
 
@@ -21,6 +32,27 @@ Legacy MES/RMS/APC/FDC systems decide whether and how to execute it.
 This lets the AI layer keep producing concrete recommendations and predicted
 actions while preserving the real plant boundary where legacy MES remains the
 system of record and execution authority.
+
+## Registry To Proposal Flow
+
+```mermaid
+flowchart TD
+  Config["runtime config or master data"] --> Registry["operation/equipment registry"]
+  Registry --> PolicyBinding["L1/L2/L3/L4 policy keys"]
+  Registry --> Display["display names and route graph"]
+  Registry --> Capability["equipment capability lookup"]
+
+  PolicyBinding --> Candidate["candidate generation"]
+  Capability --> Candidate
+  Candidate --> Command["validated MESCommand"]
+  Command --> Proposal["ActionProposal"]
+  Proposal --> LegacyDecision["legacy MES accept/modify/reject"]
+  LegacyDecision --> Outcome["execution and quality outcome"]
+```
+
+The registry is the generalization point. A/B/C remain valid canonical ids for
+the simulator, but production operation ids can enter through the registry
+without rewriting the policy and UI contracts.
 
 ## Operation Registry V1
 
@@ -145,8 +177,10 @@ validated command.
     "legacy_submission_mode": "SIMULATOR_ONLY",
     "direct_equipment_control": false,
     "lifecycle": {
+        "review_count": 0,
         "legacy_decision_count": 0,
         "outcome_count": 0,
+        "latest_review_status": "",
         "latest_legacy_status": "",
         "latest_outcome_status": ""
     },
@@ -167,9 +201,9 @@ integration API, but it must not bypass the production authority boundary.
 
 ## Action Proposal Lifecycle V1
 
-Action Proposal Lifecycle records capture what the legacy execution authority
-did with an AI proposal and what happened afterward. This is the minimum
-production feedback loop needed before connecting real MES/FDC/QA data.
+Action Proposal Lifecycle records capture review, what the legacy execution
+authority did with an AI proposal, and what happened afterward. This is the
+minimum production feedback loop needed before connecting real MES/FDC/QA data.
 
 Current implementation:
 
@@ -177,11 +211,32 @@ Current implementation:
 - store: `InMemoryMESStore` and `SQLiteMESStore`
 - normalized index: `proposal_lifecycle_index`
 - APIs:
+  - `GET /api/v2/action-proposals/approval-queue`
+  - `POST /api/v2/action-proposals/{proposal_id}/reviews`
+  - `GET /api/v2/action-proposals/{proposal_id}/workflow`
   - `POST /api/v2/action-proposals/{proposal_id}/legacy-decisions`
   - `GET /api/v2/action-proposals/{proposal_id}/legacy-decisions`
   - `POST /api/v2/action-proposals/{proposal_id}/outcomes`
   - `GET /api/v2/action-proposals/{proposal_id}/outcomes`
   - `GET /api/v2/action-proposals/{proposal_id}/lifecycle`
+
+`ActionProposalReview` records operator or process-engineer review before a
+proposal is safe to submit to a legacy MES boundary:
+
+```python
+{
+    "review_id": "APR_...",
+    "proposal_id": "PROP_CMD_123",
+    "review_status": "APPROVED",
+    "correlation_id": "CORR_...",
+    "reviewer": "process_engineer",
+    "required_role": "PROCESS_ENGINEER",
+    "reviewed_at": 120,
+    "reason": "safe legacy MES review candidate",
+    "payload": {},
+    "run_id": "RUN_..."
+}
+```
 
 `LegacyDecision` records the legacy MES decision:
 
@@ -226,6 +281,20 @@ physics, and they do not imply direct AI control. They let the AI MES compare
 what it recommended against what legacy MES actually accepted, modified,
 rejected, or executed.
 
+The current safe workflow state is:
+
+```text
+ActionProposal
+-> PENDING_REVIEW
+-> APPROVED_FOR_LEGACY_SUBMISSION or REJECTED_BY_REVIEW
+-> LEGACY_ACCEPTED / LEGACY_MODIFIED / LEGACY_REJECTED
+-> OUTCOME_RECORDED
+```
+
+`safe_to_submit_to_legacy` is true only after an `APPROVED` review and only
+while `direct_equipment_control=false`. This keeps the AI MES as a proposal and
+evaluation system, not an equipment-control system.
+
 ## Legacy Execution Loop Target
 
 The target production loop is:
@@ -253,6 +322,6 @@ The next production-facing contracts should add:
 
 - ingestion contracts for legacy MES/RMS/FDC/APC/ERP source records,
 - production PostgreSQL DDL and migration scripts,
-- production outbox adapter and operator approval queue,
+- production outbox adapter,
 - reservation locks and operator approval states,
 - production operation insertion from route/equipment master data.

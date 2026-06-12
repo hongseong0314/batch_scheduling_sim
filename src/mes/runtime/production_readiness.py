@@ -39,10 +39,15 @@ def production_readiness_payload(context: Any) -> Dict[str, Any]:
             "operator_approval_required_for_writes": True,
         },
         "integration_points": {
+            "production_schema": "/api/v2/production/schema",
+            "data_quality": "/api/v2/production/data-quality",
             "legacy_ingestion": "/api/v2/ingestion/source-records",
             "source_adapters": "/api/v2/legacy-adapters/{adapter_id}/ingest",
             "canonical_runner": "/api/v2/digital-twin/recommendation-run",
             "action_proposals": "/api/v2/action-proposals",
+            "action_proposal_approval_queue": "/api/v2/action-proposals/approval-queue",
+            "decision_dataset": "/api/v2/ai-dev/decision-dataset",
+            "policy_evaluation_summary": "/api/v2/ai-dev/policy-evaluation-summary",
             "feedback_summary": "/api/v2/action-proposals/{proposal_id}/feedback-summary",
         },
     }

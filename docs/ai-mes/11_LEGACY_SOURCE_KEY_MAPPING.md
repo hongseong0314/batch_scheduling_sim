@@ -1,7 +1,17 @@
 # Legacy Source Key Mapping
 
-Status: canonical production-transition specification  
-Last updated: 2026-05-24
+Status: canonical production-transition specification
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: data integration engineers mapping MES/RMS/FDC/APC/ERP keys
+into AI MES entities.
+
+Use this when designing source adapters, resolving duplicate or missing source
+keys, or linking production evidence to canonical lot/unit/equipment ids.
+
+Read after: [10_OPERATION_REGISTRY_ACTION_PROPOSAL.md](10_OPERATION_REGISTRY_ACTION_PROPOSAL.md).
 
 ## Purpose
 
@@ -18,6 +28,21 @@ legacy source key -> canonical AI MES entity id
 
 The contract lets adapters ingest real data without forcing the AI decision
 stack to understand every source-system key format.
+
+## Key Resolution Flow
+
+```mermaid
+flowchart LR
+  Source["source system key"] --> Mapping["SourceKeyMapping"]
+  Mapping --> Canonical["canonical AI MES id"]
+  Canonical --> Entity["lot / unit / equipment / recipe / event"]
+  Entity --> Trace["genealogy and decision trace"]
+  Entity --> Policy["policy-ready decision_state"]
+```
+
+This mapping layer is what makes production traceability possible when source
+systems disagree on primary keys. Policy code should use canonical ids, while
+the mapping table preserves the original source evidence.
 
 ## Contract
 
@@ -91,6 +116,22 @@ Developer ledger access:
 GET /api/v2/ledger-index/source_key_mapping_index
 ```
 
+Check active mappings for production data quality issues:
+
+```http
+GET /api/v2/production/data-quality
+```
+
+This endpoint flags the most dangerous mapping problem for production AI:
+
+```text
+one active source key -> multiple canonical ids
+```
+
+The system reports this as `SOURCE_KEY_CANONICAL_CONFLICT`. It does not choose
+the correct canonical id automatically; integration or operations must resolve
+the source-of-truth conflict.
+
 ## Production Usage
 
 Adapters should resolve source data in this order:
@@ -109,14 +150,14 @@ policy logic.
 
 Legacy Ingestion V1 now automates step 4 when an ingested source record carries
 `canonical_id`. See
-[`13_LEGACY_INGESTION_CONTRACT.md`](13_LEGACY_INGESTION_CONTRACT.md) for the
+[`12_LEGACY_INGESTION_CONTRACT.md`](12_LEGACY_INGESTION_CONTRACT.md) for the
 raw/canonical ingestion record contract.
 
 ## Boundaries
 
 V1 intentionally does not implement:
 
-- full legacy ingestion adapters,
+- all legacy ingestion adapters,
 - source schema inference,
 - automatic fuzzy matching,
 - conflict resolution workflows,

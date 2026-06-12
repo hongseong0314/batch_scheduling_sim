@@ -7,7 +7,11 @@ import json
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional
 
-from src.mes.action_proposals import LegacyDecision, OutcomeRecord
+from src.mes.action_proposals import (
+    ActionProposalReview,
+    LegacyDecision,
+    OutcomeRecord,
+)
 from src.mes.domain import (
     AIRecommendation,
     Equipment,
@@ -25,6 +29,26 @@ from src.mes.ingestion import CanonicalIngestionRecord, RawSourceRecord
 
 class SQLiteRecordMixin:
     """JSON record persistence and cache loading helpers."""
+
+    def add_action_proposal_review(self, review: ActionProposalReview) -> None:
+        super().add_action_proposal_review(review)
+        payload = review.to_dict()
+        self._upsert(
+            "action_proposal_reviews",
+            review.review_id,
+            review.correlation_id,
+            payload,
+        )
+        self._index_proposal_lifecycle(
+            run_id=review.run_id,
+            proposal_id=review.proposal_id,
+            record_type="REVIEW",
+            record_id=review.review_id,
+            correlation_id=review.correlation_id,
+            status=review.review_status,
+            event_time=review.reviewed_at,
+            payload=payload,
+        )
 
     def add_legacy_decision(self, decision: LegacyDecision) -> None:
         super().add_legacy_decision(decision)
@@ -240,6 +264,9 @@ class SQLiteRecordMixin:
             payload.pop("source_key", None)
             mapping = SourceKeyMapping(**payload)
             self._source_key_mappings[mapping.mapping_id] = mapping
+        for payload in self._rows("action_proposal_reviews", limit=self.cache_limit):
+            review = ActionProposalReview(**payload)
+            self._action_proposal_reviews[review.review_id] = review
         for payload in self._rows("legacy_decisions", limit=self.cache_limit):
             decision = LegacyDecision(**payload)
             self._legacy_decisions[decision.decision_id] = decision

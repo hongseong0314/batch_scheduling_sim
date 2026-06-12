@@ -1,7 +1,17 @@
 # API Contracts
 
-Status: canonical  
-Last updated: 2026-05-24
+Status: canonical
+Last updated: 2026-05-31
+
+## Reader
+
+Primary reader: API developers, UI developers, and integration engineers who
+need stable request/response contracts.
+
+Use this when adding an endpoint, changing a payload, wiring a UI panel, or
+building an external integration against the simulator-backed MES.
+
+Read after: [05_RUNTIME_HARNESS_RULE_ENGINE.md](05_RUNTIME_HARNESS_RULE_ENGINE.md).
 
 ## Purpose
 
@@ -11,6 +21,32 @@ contracts needed for the layered AI architecture.
 The FastAPI app wiring lives in `src/mes/api.py`. Feature-specific route
 declarations live in small router modules under `src/mes/runtime/*_api.py` and
 delegate runtime behavior to `src/mes/runtime/*`.
+
+## API Surface Map
+
+```mermaid
+flowchart TD
+  UI["/mes control room"] --> Live["live state and Gantt APIs"]
+  UI --> Trace["decision/assignment/genealogy trace APIs"]
+  UI --> Dev["AI developer APIs"]
+  UI --> Chat["process chat APIs"]
+
+  Live --> Runtime["MESAPIContext runtime"]
+  Trace --> Store["MES store and ledger indexes"]
+  Dev --> Harness["policy harness and experiments"]
+  Chat --> Agent["read-only agent tool runtime"]
+
+  Runtime --> Env["simulator or canonical twin state"]
+  Harness --> Rule["Rule Engine"]
+  Rule --> Commands["commands/action proposals"]
+  Commands --> Store
+```
+
+The API is organized by user question rather than by internal class. Control
+room endpoints answer "what is happening now", trace endpoints answer "why did
+this happen", AI developer endpoints answer "which policy/candidate caused it",
+and production endpoints answer "what proposal or source record crossed the
+legacy boundary".
 
 | Runtime concern | Module |
 |---|---|
@@ -50,6 +86,8 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/ai-dev/policy-stack` | Active L1/L2/L3/L4 policy stack and config |
 | `GET /api/v2/ai-dev/decision-cycles` | Correlation-level AI decision cycle browser |
 | `GET /api/v2/ai-dev/candidate-portfolio/{correlation_id}` | Developer portfolio payload with score/L2 details |
+| `GET /api/v2/ai-dev/decision-dataset` | Learning/evaluation-ready decision rows across portfolio, command, proposal, workflow, and outcome evidence |
+| `GET /api/v2/ai-dev/policy-evaluation-summary` | Policy platform summary over decisions, validation statuses, workflow states, experiments, and learning-ready rows |
 | `GET /api/v2/equipment/{equipment_id}/detail` | A/B/C machine quality and packing detail data |
 | `GET /api/v2/gantt` | Gantt rows, bars, stage views, and horizon |
 | `GET /api/v2/fab/live` | Live control-room state |
@@ -57,10 +95,14 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/operations` | Operation and equipment registry for simulator and future production process mapping |
 | `GET /api/v2/operations/route-graph` | Operation route graph with downstream edges and capable equipment |
 | `GET /api/v2/production-readiness` | Deployment-boundary readiness and persistence diagnostics |
+| `GET /api/v2/production/schema` | Canonical production data schema contract and current persistence/index introspection |
+| `GET /api/v2/production/data-quality` | Raw/canonical/source-key data quality diagnostics for the active production-shaped run |
 | `GET /api/v2/action-proposals` | Legacy-safe action proposals derived from validated MES commands |
 | `GET /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Legacy MES accept/modify/reject decision records for one proposal |
 | `GET /api/v2/action-proposals/{proposal_id}/outcomes` | Execution/quality outcome records for one proposal |
 | `GET /api/v2/action-proposals/{proposal_id}/lifecycle` | Combined lifecycle summary, legacy decisions, and outcomes for one proposal |
+| `GET /api/v2/action-proposals/approval-queue` | Review queue with approval-gated workflow state for generated action proposals |
+| `GET /api/v2/action-proposals/{proposal_id}/workflow` | Safe workflow state for one action proposal |
 | `GET /api/v2/action-proposals/{proposal_id}/feedback-summary` | Proposed-vs-actual feedback summary for policy evaluation |
 | `GET /api/v2/legacy-adapters` | Source-specific row adapter catalog |
 | `GET /api/v2/source-key-mappings` | Legacy source-system key to canonical AI MES id mappings |
@@ -71,6 +113,7 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `GET /api/v2/genealogy/task/{task_uid}` | Run-scoped task/wafer lineage with assignments, command links, and simulator events |
 | `GET /api/v2/genealogy/equipment/{equipment_id}` | Run-scoped equipment command and process timeline |
 | `GET /api/v2/genealogy/lot/{lot_id}` | Run-scoped lot-level task and command rollout |
+| `GET /api/v2/genealogy/canonical/{entity_type}/{canonical_id}` | Canonical twin entity genealogy with raw source evidence and replay timeline |
 | `GET /api/v2/execution-ledger/{correlation_id}` | Run-scoped command, rule, simulator-action, and post-state ledger |
 | `GET /api/v2/digital-twin/state-at?time=0` | Run-scoped replayable decision-state snapshot at or before time |
 | `GET /api/v2/digital-twin/canonical-state` | Event-sourced production twin state replayed from canonical ingestion records |
@@ -99,6 +142,7 @@ delegate runtime behavior to `src/mes/runtime/*`.
 | `POST /api/v2/process-tools/{tool_id}/run` | Read-only process model inference with structured input |
 | `POST /api/v2/process-chat` | Process-engineer chat over read-only process tools with LLM/fallback mode |
 | `POST /api/v2/legacy-adapters/{adapter_id}/ingest` | Adapt one source-specific row and ingest it through the canonical contract |
+| `POST /api/v2/action-proposals/{proposal_id}/reviews` | Record operator/process-engineer review before legacy submission |
 | `POST /api/v2/action-proposals/{proposal_id}/legacy-decisions` | Record the legacy MES decision for an AI proposal |
 | `POST /api/v2/action-proposals/{proposal_id}/outcomes` | Record actual execution/quality evidence for an AI proposal |
 | `POST /api/v2/source-key-mappings` | Upsert one legacy source-key mapping |
@@ -191,6 +235,138 @@ diagnostics.
 LLM/MCP use. `POST /api/v2/process-tools/{tool_id}/run` executes one read-only
 inference. The first implemented tool is `predict_process_a_apc`, backed by the
 Process A rule-based APC model.
+
+`GET /api/v2/production/schema` exposes the production data contract that the
+current SQLite MVP must preserve when moved to PostgreSQL.
+
+```python
+{
+    "schema_version": "canonical-production-data-v1",
+    "status": "POSTGRESQL_READY_CONTRACT_DRAFT",
+    "storage_target": "postgresql",
+    "current_mvp_backend": {
+        "backend": "sqlite_json_plus_indexes",
+        "schema_version": "legacy_ingestion_v1",
+        "tables": {"canonical_ingestion_records": "record_id"},
+        "normalized_indexes": ["source_key_mapping_index", "..."]
+    },
+    "tables": {
+        "units": {
+            "primary_key": "unit_id",
+            "required_fields": ["unit_id", "lot_id", "operation_id", "status"]
+        }
+    },
+    "invariants": [
+        "Event time, ingest time, and decision time are stored separately."
+    ]
+}
+```
+
+`GET /api/v2/production/data-quality` checks whether raw records, canonical
+records, and source-key mappings are safe enough to build a policy-ready digital
+twin.
+
+```python
+{
+    "schema_version": "canonical-production-data-v1",
+    "status": "OK",
+    "counts": {
+        "raw_records": 3,
+        "canonical_records": 3,
+        "source_key_mappings": 3,
+        "issues": 0
+    },
+    "coverage": {
+        "entity_types": {"UNIT": 2, "EQUIPMENT": 1},
+        "operations": [{"operation_id": "A", "canonical_records": 3}]
+    },
+    "freshness": {
+        "latest_event_time": 3,
+        "latest_ingest_time": 4,
+        "event_lag": 1
+    },
+    "issues": []
+}
+```
+
+`GET /api/v2/genealogy/canonical/{entity_type}/{canonical_id}` follows a
+canonical entity through replayed canonical records and the raw source evidence
+behind those records.
+
+```python
+{
+    "found": True,
+    "entity_type": "UNIT",
+    "canonical_id": "WAFER_401",
+    "record_count": 2,
+    "raw_evidence_count": 2,
+    "timeline": [
+        {"event_type": "UNIT_WAITING", "operation_id": "A"},
+        {"event_type": "QUALITY_MEASURED", "operation_id": "A"}
+    ],
+    "related_entities": {
+        "lot_ids": ["LOT_TRACE_ALPHA"],
+        "equipment_ids": [],
+        "operation_ids": ["A"]
+    }
+}
+```
+
+`GET /api/v2/ai-dev/decision-dataset` exposes the production-oriented policy
+evaluation row set. It does not train a model; it makes the current rule/FIFO
+decisions reviewable as future learning data.
+
+```python
+{
+    "count": 1,
+    "items": [
+        {
+            "correlation_id": "CORR_...",
+            "state_source": "CANONICAL_TWIN",
+            "objective_id": "OBJ_THROUGHPUT_FIRST",
+            "selected_stage": "A",
+            "selected_candidate_id": "CAND_...",
+            "candidate_count": 1,
+            "policy_stack": {
+                "l1_policy_id": "L1_FIFO_BASELINE",
+                "l2_policy_id": "L2_RULE_BASED_APC",
+                "l3_policy_id": "L3_CANDIDATE_PORTFOLIO_RULE",
+                "l4_policy_id": "L4_CYCLE_WEIGHT_RULE"
+            },
+            "validation_status": "PASSED",
+            "action_proposal": {"proposal_id": "PROP_CMD_..."},
+            "workflow": {"current_status": "PENDING_REVIEW"},
+            "learning_label": {
+                "has_legacy_decision": False,
+                "has_outcome": False,
+                "usable_for_policy_evaluation": False
+            }
+        }
+    ]
+}
+```
+
+`GET /api/v2/action-proposals/{proposal_id}/workflow` and
+`POST /api/v2/action-proposals/{proposal_id}/reviews` implement the current
+safe proposal gate.
+
+```python
+POST /api/v2/action-proposals/PROP_CMD_123/reviews
+{
+    "review_status": "APPROVED",
+    "reviewer": "process_engineer",
+    "required_role": "PROCESS_ENGINEER",
+    "reason": "safe legacy MES review candidate"
+}
+
+{
+    "workflow": {
+        "current_status": "APPROVED_FOR_LEGACY_SUBMISSION",
+        "safe_to_submit_to_legacy": True,
+        "direct_equipment_control": False
+    }
+}
+```
 
 ```python
 POST /api/v2/process-tools/predict_process_a_apc/run

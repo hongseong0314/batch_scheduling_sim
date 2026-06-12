@@ -8,9 +8,12 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Body, Query
 
 from src.mes.action_proposals import (
+    action_proposal_approval_queue_payload,
     action_proposal_lifecycle_payload,
     action_proposal_lifecycle_summary,
+    action_proposal_review_from_payload,
     action_proposal_feedback_summary,
+    action_proposal_workflow_payload,
     action_proposals_payload,
     legacy_decision_from_payload,
     outcome_record_from_payload,
@@ -22,6 +25,10 @@ from src.mes.runtime.legacy_ingestion import (
     raw_source_records_payload,
 )
 from src.mes.runtime.operations import operations_payload, route_graph_payload
+from src.mes.runtime.production_data import (
+    production_data_quality_payload,
+    production_schema_payload,
+)
 from src.mes.runtime.production_readiness import production_readiness_payload
 from src.mes.runtime.source_key_mappings import (
     resolve_source_key_mapping_payload,
@@ -45,6 +52,21 @@ def build_production_boundary_router(context: Any) -> APIRouter:
     def production_readiness() -> Dict[str, Any]:
         return production_readiness_payload(context)
 
+    @router.get("/api/v2/production/schema")
+    def production_schema(run_id: Optional[str] = Query(None)) -> Dict[str, Any]:
+        return production_schema_payload(context, run_id=run_id)
+
+    @router.get("/api/v2/production/data-quality")
+    def production_data_quality(
+        run_id: Optional[str] = Query(None),
+        at_time: Optional[int] = Query(None, ge=0),
+    ) -> Dict[str, Any]:
+        return production_data_quality_payload(
+            context,
+            run_id=run_id,
+            at_time=at_time,
+        )
+
     @router.get("/api/v2/action-proposals")
     def action_proposals(
         correlation_id: Optional[str] = Query(None),
@@ -55,6 +77,49 @@ def build_production_boundary_router(context: Any) -> APIRouter:
             correlation_id=correlation_id,
             run_id=run_id,
         )
+
+    @router.get("/api/v2/action-proposals/approval-queue")
+    def action_proposal_approval_queue(
+        status: Optional[str] = Query(None),
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return action_proposal_approval_queue_payload(
+            context,
+            status=status,
+            run_id=run_id,
+        )
+
+    @router.post("/api/v2/action-proposals/{proposal_id}/reviews")
+    def record_action_proposal_review(
+        proposal_id: str,
+        payload: Dict[str, Any] = Body(default_factory=dict),
+    ) -> Dict[str, Any]:
+        workflow = action_proposal_workflow_payload(context, proposal_id)
+        if not workflow.get("found"):
+            return workflow
+        proposal = workflow["proposal"]
+        review = action_proposal_review_from_payload(
+            proposal_id,
+            payload,
+            default_run_id=proposal.get("run_id") or context.run_id,
+            default_correlation_id=proposal.get("correlation_id") or "",
+        )
+        context.harness.store.add_action_proposal_review(review)
+        return {
+            "item": review.to_dict(),
+            "workflow": action_proposal_workflow_payload(
+                context,
+                proposal_id,
+                run_id=review.run_id,
+            ),
+        }
+
+    @router.get("/api/v2/action-proposals/{proposal_id}/workflow")
+    def action_proposal_workflow(
+        proposal_id: str,
+        run_id: Optional[str] = Query(None),
+    ) -> Dict[str, Any]:
+        return action_proposal_workflow_payload(context, proposal_id, run_id=run_id)
 
     @router.post("/api/v2/action-proposals/{proposal_id}/legacy-decisions")
     def record_legacy_decision(

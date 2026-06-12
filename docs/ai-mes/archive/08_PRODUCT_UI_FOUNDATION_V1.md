@@ -1,7 +1,7 @@
 # MES Product UI Foundation V1
 
-Status: planned  
-Branch: `codex/mes-product-ui-foundation-v1`  
+Status: planned
+Branch: `codex/mes-product-ui-foundation-v1`
 Base: `mes` at `e59e610`
 
 ## Goal
@@ -89,7 +89,7 @@ is expanded:
    `src/mes/ui/static/control_room.css`.
 4. Improve dense id and raw payload rendering in
    `src/mes/ui/static/control_room.js`.
-5. Update `docs/ai-mes/06_UI_CONTROL_ROOM_SPEC.md` to reference this product
+5. Update `docs/ai-mes/08_UI_CONTROL_ROOM_SPEC.md` to reference this product
    shell direction.
 6. Verify with focused tests, full pytest, and browser smoke checks for
    `#machine`, `#assignment-trace`, and `#ai-dev`.

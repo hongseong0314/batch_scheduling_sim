@@ -42,5 +42,6 @@ docs/*
 .continue
 .codex
 .claude
+.superpowers/
 *.log
 AGENTS.md

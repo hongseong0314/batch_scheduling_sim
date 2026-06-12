@@ -26,10 +26,18 @@
         content: "A 공정 APC 예측 질문을 입력하면 read-only process tool 결과를 기반으로 답변합니다.",
         mode: "ready",
         tool_calls: [],
+        visual_artifacts: [],
       }
     ];
     let chatModels = [];
+    let chatArtifacts = [];
+    let activeChatArtifactId = null;
+    let chatInspectorPinned = false;
+    let chatInspectorFullscreen = false;
+    let chatInspectorTab = "chart";
+    let chatPrimaryWidth = 40;
     const AI_DEV_CYCLE_LIMIT = 25;
+    const CHAT_CHART_COLORS = ["#0f62fe", "#198038", "#8a3ffc", "#b28600", "#da1e28", "#007d79", "#6929c4", "#005d5d"];
 
     const statusClass = (status) => {
       const s = String(status || "").toUpperCase();
@@ -126,6 +134,7 @@
         const role = String(message.role || "assistant");
         const toolCalls = message.tool_calls || [];
         const agentTrace = message.agent_trace || [];
+        const visualArtifacts = message.visual_artifacts || [];
         const toolHtml = toolCalls.length
           ? `<div class="chat-tool-call">${toolCalls.map(call => {
               return `${escapeText(formatToolCallLabel(call))}<br /><span>${escapeText(summarizeToolResult(call.result || call.error || {}))}</span>`;
@@ -139,13 +148,30 @@
               return `<span>${index + 1}. ${escapeText(label)}</span>`;
             }).join("")}</div>`
           : "";
+        const artifactHtml = visualArtifacts.length
+          ? `<div class="chat-artifact-list">${visualArtifacts.map(artifact => {
+              const isActive = artifact.artifact_id === activeChatArtifactId;
+              const scope = [
+                ...(artifact.equipment_ids || []),
+                ...(artifact.metrics || []),
+              ].join(" · ");
+              return `<button class="chat-artifact-button ${isActive ? "active" : ""}" type="button" data-chat-artifact-id="${escapeText(artifact.artifact_id || "")}">
+                <span><strong>${escapeText(artifact.title || "Visual analysis")}</strong><span>${escapeText(scope || artifact.artifact_type || "artifact")}</span></span>
+                <span>Open</span>
+              </button>`;
+            }).join("")}</div>`
+          : "";
         return `<article class="chat-message ${escapeText(role)}">
           <strong>${escapeText(role)}${message.mode ? ` · ${escapeText(message.mode)}` : ""}</strong>
           <p>${escapeText(message.content)}</p>
           ${toolHtml}
           ${traceHtml}
+          ${artifactHtml}
         </article>`;
       }).join("");
+      thread.querySelectorAll("[data-chat-artifact-id]").forEach(button => {
+        button.onclick = () => activateChatArtifact(button.dataset.chatArtifactId);
+      });
       thread.scrollTop = thread.scrollHeight;
       const count = chatMessages.filter(message => message.role === "assistant").length;
       document.getElementById("nav-chat").textContent = count ? String(count) : "ready";
@@ -154,7 +180,7 @@
     async function sendChatMessage(message) {
       const trimmed = String(message || "").trim();
       if (!trimmed) return;
-      chatMessages.push({ role: "user", content: trimmed, mode: "", tool_calls: [] });
+      chatMessages.push({ role: "user", content: trimmed, mode: "", tool_calls: [], visual_artifacts: [] });
       renderChatThread();
       const status = document.getElementById("chat-status");
       const sendButton = document.getElementById("chat-send");
@@ -168,13 +194,19 @@
           mode: document.getElementById("chat-mode").value || "agent",
           max_steps: Number(document.getElementById("chat-max-steps").value || 5),
         });
+        const visualArtifacts = payload.visual_artifacts || [];
         chatMessages.push({
           role: "assistant",
           content: payload.answer || "No answer returned.",
           mode: payload.mode || "-",
           tool_calls: payload.tool_calls || [],
           agent_trace: payload.agent_trace || [],
+          visual_artifacts: payload.visual_artifacts || [],
         });
+        registerChatArtifacts(visualArtifacts);
+        if (visualArtifacts.length && (!chatInspectorPinned || !activeChatArtifactId)) {
+          activateChatArtifact(visualArtifacts[visualArtifacts.length - 1].artifact_id);
+        }
         status.textContent = payload.fallback_used ? "fallback" : (payload.mode || "answered");
       } catch (error) {
         chatMessages.push({
@@ -183,6 +215,7 @@
           mode: "error",
           tool_calls: [],
           agent_trace: [],
+          visual_artifacts: [],
         });
         status.textContent = "error";
       } finally {
@@ -203,6 +236,9 @@
       if (result.predicted_qa !== undefined) {
         return `predicted_qa ${result.predicted_qa} · risk ${result.quality_risk || "-"}`;
       }
+      if (result.visual_artifacts || (result.source && result.metrics)) {
+        return `${(result.equipment_ids || []).join(", ") || "equipment"} · ${(result.metrics || []).join(", ") || "telemetry"} · ${(result.series || []).length} points · ${result.effective_range || "-"}`;
+      }
       if (result.time !== undefined && result.stages) {
         const stages = result.stages || {};
         return `t=${result.time} · A wait ${stages.A?.wait ?? "-"} · B wait ${stages.B?.wait ?? "-"} · C wait ${stages.C?.wait ?? "-"}`;
@@ -221,6 +257,314 @@
       const operation = call.operation_id ? `${call.operation_id} · ` : "";
       const policyId = call.policy_id ? ` · ${call.policy_id}` : "";
       return `${layer}${operation}${call.tool_name || "-"} · ${call.status || "executed"} · ${call.policy || "-"}${policyId}`;
+    }
+
+    function registerChatArtifacts(artifacts) {
+      const supportedTypes = new Set(["equipment_timeseries", "equipment_anomalies"]);
+      const supportedCharts = new Set(["line", "bar", "event_timeline"]);
+      (artifacts || []).forEach(artifact => {
+        if (!artifact || !artifact.artifact_id || !supportedTypes.has(artifact.artifact_type)) return;
+        if (!supportedCharts.has(artifact.visualization?.chart_type)) return;
+        const index = chatArtifacts.findIndex(item => item.artifact_id === artifact.artifact_id);
+        if (index >= 0) chatArtifacts[index] = artifact;
+        else chatArtifacts.push(artifact);
+      });
+    }
+
+    function activateChatArtifact(artifactId) {
+      const artifact = chatArtifacts.find(item => item.artifact_id === artifactId);
+      if (!artifact) return;
+      activeChatArtifactId = artifact.artifact_id;
+      const workspace = document.getElementById("chat-workspace");
+      const inspector = document.getElementById("chat-active-inspector");
+      const divider = document.getElementById("chat-inspector-divider");
+      inspector.hidden = false;
+      divider.hidden = false;
+      workspace.classList.add("chat-inspector-open");
+      workspace.classList.toggle("chat-inspector-fullscreen", chatInspectorFullscreen);
+      renderChatInspector();
+      renderChatThread();
+    }
+
+    function closeChatInspector() {
+      activeChatArtifactId = null;
+      chatInspectorPinned = false;
+      chatInspectorFullscreen = false;
+      const workspace = document.getElementById("chat-workspace");
+      workspace.classList.remove("chat-inspector-open", "chat-inspector-fullscreen");
+      document.getElementById("chat-active-inspector").hidden = true;
+      document.getElementById("chat-inspector-divider").hidden = true;
+      document.getElementById("chat-inspector-pin").setAttribute("aria-pressed", "false");
+      document.getElementById("chat-inspector-expand").setAttribute("aria-pressed", "false");
+      renderChatThread();
+    }
+
+    function setChatInspectorTab(tab) {
+      chatInspectorTab = ["chart", "data", "events"].includes(tab) ? tab : "chart";
+      document.querySelectorAll("[data-chat-inspector-tab]").forEach(button => {
+        const active = button.dataset.chatInspectorTab === chatInspectorTab;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+      });
+      document.querySelectorAll("[data-chat-inspector-view]").forEach(view => {
+        view.classList.toggle("active", view.dataset.chatInspectorView === chatInspectorTab);
+      });
+    }
+
+    function renderChatInspector() {
+      const artifact = chatArtifacts.find(item => item.artifact_id === activeChatArtifactId);
+      if (!artifact) return;
+      const provenance = artifact.provenance || {};
+      const equipmentLabels = artifactDisplayEquipment(artifact);
+      document.getElementById("chat-inspector-title").textContent = artifact.title || "Equipment analysis";
+      document.getElementById("chat-inspector-scope").textContent = [
+        equipmentLabels.join(", "),
+        (artifact.metrics || []).join(", "),
+        provenance.effective_range || "",
+      ].filter(Boolean).join(" · ");
+      document.getElementById("chat-inspector-kpis").innerHTML = renderArtifactKpis(artifact);
+      renderChatInspectorChart(artifact);
+      renderChatInspectorData(artifact);
+      renderChatInspectorEvents(artifact);
+      document.getElementById("chat-inspector-provenance").innerHTML = [
+        `<strong>Source:</strong> ${escapeText(provenance.source || "UNKNOWN")}`,
+        `<strong>Time:</strong> ${escapeText(provenance.time_basis || "UNKNOWN")}`,
+        `<strong>Requested:</strong> ${escapeText(provenance.requested_range || "-")}`,
+        `<strong>Effective:</strong> ${escapeText(provenance.effective_range || "-")}`,
+        `<strong>Tool:</strong> ${escapeText(provenance.query_tool || "-")}`,
+      ].join(" · ");
+      setChatInspectorTab(chatInspectorTab);
+    }
+
+    function artifactDisplayEquipment(artifact) {
+      const labels = [];
+      [...(artifact.series || []), ...(artifact.events || [])].forEach(item => {
+        const label = item.display_name || item.equipment_id;
+        if (label && !labels.includes(label)) labels.push(label);
+      });
+      if (!labels.length) return artifact.equipment_ids || [];
+      return labels;
+    }
+
+    function artifactEvents(artifact) {
+      const events = [...(artifact.events || [])];
+      (artifact.series || []).forEach(point => {
+        if (point.event && !events.some(event => event.event_id === point.event.event_id)) {
+          events.push(point.event);
+        }
+      });
+      return events.sort((a, b) => Number(a.time || 0) - Number(b.time || 0));
+    }
+
+    function renderArtifactKpis(artifact) {
+      const events = artifactEvents(artifact);
+      const summary = artifact.summary || {};
+      const oosCount = Object.values(summary).reduce((total, equipmentSummary) => {
+        const quality = equipmentSummary && typeof equipmentSummary === "object"
+          ? equipmentSummary.quality
+          : null;
+        return total + Number(quality?.oos_count || 0);
+      }, 0);
+      const items = artifact.artifact_type === "equipment_anomalies"
+        ? [
+            ["Equipment", (artifact.equipment_ids || []).length],
+            ["Observed alarms", summary.observed_alarm_count || 0],
+            ["Derived anomalies", summary.derived_anomaly_count || 0],
+            ["Events", events.length],
+          ]
+        : [
+            ["Equipment", (artifact.equipment_ids || []).length],
+            ["Metrics", (artifact.metrics || []).length],
+            ["Data points", (artifact.series || []).length],
+            ["Quality OOS", oosCount],
+          ];
+      return items.map(([label, value]) => `
+        <div class="chat-inspector-kpi">
+          <span>${escapeText(label)}</span>
+          <strong>${escapeText(value)}</strong>
+        </div>`).join("");
+    }
+
+    function renderChatInspectorChart(artifact) {
+      const target = document.getElementById("chat-inspector-chart");
+      const chartType = artifact.visualization?.chart_type;
+      if (chartType === "event_timeline") {
+        target.innerHTML = renderEventTimelineChart(artifact);
+        return;
+      }
+      const points = artifact.series || [];
+      const availableMetrics = [...new Set(points.map(point => point.metric).filter(Boolean))];
+      const metrics = [
+        ...(artifact.metrics || []).filter(metric => availableMetrics.includes(metric)),
+        ...availableMetrics.filter(metric => !(artifact.metrics || []).includes(metric)),
+      ];
+      if (!metrics.length) {
+        target.innerHTML = "<div class='empty-state'>No time-series points were returned for this range.</div>";
+        return;
+      }
+      target.innerHTML = `<div class="chat-inspector-chart">${metrics.map(metric =>
+        renderMetricChart(artifact, metric, chartType)
+      ).join("")}</div>`;
+    }
+
+    function renderMetricChart(artifact, metric, chartType) {
+      const points = (artifact.series || []).filter(point =>
+        point.metric === metric && Number.isFinite(Number(point.time)) && Number.isFinite(Number(point.value))
+      );
+      if (!points.length) return "";
+      const width = 860;
+      const height = 250;
+      const margin = { left: 58, right: 22, top: 28, bottom: 38 };
+      const plotW = width - margin.left - margin.right;
+      const plotH = height - margin.top - margin.bottom;
+      const xs = points.map(point => Number(point.time));
+      const ys = points.map(point => Number(point.value));
+      const targetBands = metric === "quality"
+        ? (artifact.visualization?.target_bands || [])
+        : [];
+      targetBands.forEach(band => {
+        if (Array.isArray(band) && band.length === 2) ys.push(Number(band[0]), Number(band[1]));
+      });
+      const minX = Number(artifact.window?.start ?? Math.min(...xs));
+      const maxX = Number(artifact.window?.end ?? Math.max(...xs));
+      const xSpan = Math.max(1, maxX - minX);
+      let minY = Math.min(...ys);
+      let maxY = Math.max(...ys);
+      const yPad = Math.max(metric === "utilization" ? 0.05 : 0.5, (maxY - minY) * 0.12);
+      minY = Math.max(metric === "utilization" ? 0 : -Infinity, minY - yPad);
+      maxY = metric === "utilization" ? Math.min(1, maxY + yPad) : maxY + yPad;
+      if (maxY <= minY) maxY = minY + 1;
+      const ySpan = maxY - minY;
+      const x = value => margin.left + ((Number(value) - minX) / xSpan) * plotW;
+      const y = value => margin.top + (1 - ((Number(value) - minY) / ySpan)) * plotH;
+      const groups = {};
+      points.forEach(point => {
+        const key = point.equipment_id || "equipment";
+        (groups[key] ||= []).push(point);
+      });
+      Object.values(groups).forEach(group => group.sort((a, b) => Number(a.time) - Number(b.time)));
+      const groupEntries = Object.entries(groups);
+      const xTicks = buildTicks(minX, maxX, 5);
+      const yTicks = buildTicks(minY, maxY, 5);
+      const targetBandHtml = targetBands.map(band => {
+        if (!Array.isArray(band) || band.length !== 2) return "";
+        const low = Number(band[0]);
+        const high = Number(band[1]);
+        return `<rect class="target-band" x="${margin.left}" y="${y(high)}" width="${plotW}" height="${Math.max(1, y(low) - y(high))}"></rect>`;
+      }).join("");
+      const seriesHtml = groupEntries.map(([equipmentId, group], index) => {
+        const color = CHAT_CHART_COLORS[index % CHAT_CHART_COLORS.length];
+        if (chartType === "bar") {
+          const barWidth = Math.max(5, Math.min(30, plotW / Math.max(1, points.length) - 4));
+          return group.map(point => `<rect x="${x(point.time) - barWidth / 2}" y="${y(point.value)}" width="${barWidth}" height="${Math.max(1, height - margin.bottom - y(point.value))}" fill="${color}"><title>${escapeText(`${point.display_name || equipmentId} t=${point.time} ${metric}=${formatArtifactValue(metric, point.value)}`)}</title></rect>`).join("");
+        }
+        const path = group.map((point, pointIndex) =>
+          `${pointIndex === 0 ? "M" : "L"} ${x(point.time)} ${y(point.value)}`
+        ).join(" ");
+        const circles = group.map(point =>
+          `<circle cx="${x(point.time)}" cy="${y(point.value)}" r="4" fill="${color}"><title>${escapeText(`${point.display_name || equipmentId} t=${point.time} ${metric}=${formatArtifactValue(metric, point.value)}`)}</title></circle>`
+        ).join("");
+        return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"></path>${circles}`;
+      }).join("");
+      const legend = groupEntries.map(([equipmentId, group], index) => {
+        const label = group[0]?.display_name || equipmentId;
+        return `<span><i style="background:${CHAT_CHART_COLORS[index % CHAT_CHART_COLORS.length]}"></i>${escapeText(label)}</span>`;
+      }).join("");
+      return `<section>
+        <div class="panel-header compact-header"><h2>${escapeText(metric.replaceAll("_", " "))}</h2><span>${points.length} points</span></div>
+        <div class="chat-inspector-legend">${legend}</div>
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeText(metric)} equipment trend">
+          ${targetBandHtml}
+          ${xTicks.map(tick => `<line class="chart-grid" x1="${x(tick)}" x2="${x(tick)}" y1="${margin.top}" y2="${height - margin.bottom}"></line><text class="chart-text" x="${x(tick)}" y="${height - 14}" text-anchor="middle">${Math.round(tick)}</text>`).join("")}
+          ${yTicks.map(tick => `<line class="chart-grid" x1="${margin.left}" x2="${width - margin.right}" y1="${y(tick)}" y2="${y(tick)}"></line><text class="chart-text" x="${margin.left - 8}" y="${y(tick) + 4}" text-anchor="end">${escapeText(formatArtifactValue(metric, tick))}</text>`).join("")}
+          <line class="chart-axis" x1="${margin.left}" x2="${width - margin.right}" y1="${height - margin.bottom}" y2="${height - margin.bottom}"></line>
+          <line class="chart-axis" x1="${margin.left}" x2="${margin.left}" y1="${margin.top}" y2="${height - margin.bottom}"></line>
+          ${seriesHtml}
+          <text class="chart-text" x="${width / 2}" y="${height - 1}" text-anchor="middle">${escapeText(artifact.provenance?.time_basis || "time")}</text>
+        </svg>
+      </section>`;
+    }
+
+    function renderEventTimelineChart(artifact) {
+      const events = artifactEvents(artifact);
+      if (!events.length) {
+        return "<div class='empty-state'>No observed alarms or derived anomalies were found in this range.</div>";
+      }
+      const width = 860;
+      const rowHeight = 54;
+      const margin = { left: 130, right: 24, top: 30, bottom: 36 };
+      const equipmentIds = [...new Set(events.map(event => event.equipment_id || "equipment"))];
+      const height = margin.top + margin.bottom + equipmentIds.length * rowHeight;
+      const windowStart = Number(artifact.window?.start ?? Math.min(...events.map(event => Number(event.time || 0))));
+      const windowEnd = Number(artifact.window?.end ?? Math.max(...events.map(event => Number(event.time || 0))));
+      const span = Math.max(1, windowEnd - windowStart);
+      const plotW = width - margin.left - margin.right;
+      const x = value => margin.left + ((Number(value) - windowStart) / span) * plotW;
+      const ticks = buildTicks(windowStart, windowEnd, 5);
+      const severityColor = { info: "#0f62fe", warning: "#b28600", critical: "#da1e28" };
+      const markers = events.map(event => {
+        const row = equipmentIds.indexOf(event.equipment_id || "equipment");
+        const cy = margin.top + row * rowHeight + rowHeight / 2;
+        const color = severityColor[event.severity] || "#6f6f6f";
+        return `<circle cx="${x(event.time)}" cy="${cy}" r="7" fill="${color}" stroke="#fff" stroke-width="2"><title>${escapeText(`${event.display_name || event.equipment_id} t=${event.time} ${event.code || "EVENT"} ${event.message || ""}`)}</title></circle>`;
+      }).join("");
+      return `<div class="chat-inspector-chart">
+        <div class="chat-inspector-legend">
+          <span><i style="background:#0f62fe"></i>Info</span>
+          <span><i style="background:#b28600"></i>Warning</span>
+          <span><i style="background:#da1e28"></i>Critical</span>
+        </div>
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Equipment alarm and anomaly timeline">
+          ${ticks.map(tick => `<line class="chart-grid" x1="${x(tick)}" x2="${x(tick)}" y1="${margin.top}" y2="${height - margin.bottom}"></line><text class="chart-text" x="${x(tick)}" y="${height - 12}" text-anchor="middle">${Math.round(tick)}</text>`).join("")}
+          ${equipmentIds.map((equipmentId, index) => {
+            const event = events.find(item => item.equipment_id === equipmentId);
+            const cy = margin.top + index * rowHeight + rowHeight / 2;
+            return `<text class="chart-text" x="${margin.left - 10}" y="${cy + 4}" text-anchor="end">${escapeText(event?.display_name || equipmentId)}</text><line class="chart-axis" x1="${margin.left}" x2="${width - margin.right}" y1="${cy}" y2="${cy}"></line>`;
+          }).join("")}
+          ${markers}
+        </svg>
+      </div>`;
+    }
+
+    function renderChatInspectorData(artifact) {
+      const target = document.getElementById("chat-inspector-data");
+      const points = artifact.series || [];
+      if (!points.length) {
+        target.innerHTML = "<div class='empty-state'>This artifact has no numeric series. Open Events for evidence rows.</div>";
+        return;
+      }
+      target.innerHTML = `<div class="table-wrap"><table class="chat-inspector-table">
+        <thead><tr><th>Equipment</th><th>Metric</th><th>Time</th><th>Value</th><th>Unit</th><th>Samples</th></tr></thead>
+        <tbody>${points.map(point => `<tr>
+          <td><strong>${escapeText(point.display_name || point.equipment_id || "-")}</strong><div class="kpi-note">${escapeText(point.equipment_id || "-")}</div></td>
+          <td>${escapeText(point.metric || "-")}</td>
+          <td>${escapeText(point.time ?? "-")}</td>
+          <td>${escapeText(formatArtifactValue(point.metric, point.value))}</td>
+          <td>${escapeText(point.unit || "-")}</td>
+          <td>${escapeText(point.sample_count ?? "-")}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+    }
+
+    function renderChatInspectorEvents(artifact) {
+      const target = document.getElementById("chat-inspector-events");
+      const events = artifactEvents(artifact);
+      if (!events.length) {
+        target.innerHTML = "<div class='empty-state'>No alarm or anomaly evidence was returned for this artifact.</div>";
+        return;
+      }
+      target.innerHTML = `<div class="chat-inspector-event-list">${events.map(event => `
+        <article class="chat-inspector-event ${escapeText(event.severity || "info")}">
+          <div><strong>${escapeText(event.code || "EVENT")}</strong> <span class="${statusClass(event.severity || "info")}">${escapeText(event.severity || "info")}</span></div>
+          <p>${escapeText(event.display_name || event.equipment_id || "-")} · t=${escapeText(event.time ?? "-")} · ${escapeText(event.evidence_class || "EVENT")}</p>
+          <p>${escapeText(event.message || "-")}</p>
+        </article>`).join("")}</div>`;
+    }
+
+    function formatArtifactValue(metric, value) {
+      if (!Number.isFinite(Number(value))) return "-";
+      if (metric === "utilization") return `${Math.round(Number(value) * 100)}%`;
+      return fmt.format(Number(value));
     }
 
     function render(live, gantt, aiDev = {}) {
@@ -1496,6 +1840,51 @@
         document.getElementById("chat-input").focus();
       };
     });
+    document.querySelectorAll("[data-chat-inspector-tab]").forEach(button => {
+      button.onclick = () => setChatInspectorTab(button.dataset.chatInspectorTab);
+    });
+    document.getElementById("chat-inspector-pin").onclick = () => {
+      chatInspectorPinned = !chatInspectorPinned;
+      document.getElementById("chat-inspector-pin").setAttribute("aria-pressed", String(chatInspectorPinned));
+    };
+    document.getElementById("chat-inspector-expand").onclick = () => {
+      chatInspectorFullscreen = !chatInspectorFullscreen;
+      const workspace = document.getElementById("chat-workspace");
+      workspace.classList.toggle("chat-inspector-fullscreen", chatInspectorFullscreen);
+      const button = document.getElementById("chat-inspector-expand");
+      button.setAttribute("aria-pressed", String(chatInspectorFullscreen));
+      button.textContent = chatInspectorFullscreen ? "Split" : "Full";
+    };
+    document.getElementById("chat-inspector-close").onclick = closeChatInspector;
+    {
+      const divider = document.getElementById("chat-inspector-divider");
+      const workspace = document.getElementById("chat-workspace");
+      let dragging = false;
+      const resizeInspector = clientX => {
+        const bounds = workspace.getBoundingClientRect();
+        if (!bounds.width) return;
+        chatPrimaryWidth = clamp(((clientX - bounds.left) / bounds.width) * 100, 28, 65);
+        workspace.style.setProperty("--chat-primary-width", `${chatPrimaryWidth}%`);
+      };
+      divider.onpointerdown = event => {
+        dragging = true;
+        divider.setPointerCapture(event.pointerId);
+        resizeInspector(event.clientX);
+      };
+      divider.onpointermove = event => {
+        if (dragging) resizeInspector(event.clientX);
+      };
+      divider.onpointerup = event => {
+        dragging = false;
+        if (divider.hasPointerCapture(event.pointerId)) divider.releasePointerCapture(event.pointerId);
+      };
+      divider.onkeydown = event => {
+        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        event.preventDefault();
+        chatPrimaryWidth = clamp(chatPrimaryWidth + (event.key === "ArrowRight" ? 2 : -2), 28, 65);
+        workspace.style.setProperty("--chat-primary-width", `${chatPrimaryWidth}%`);
+      };
+    }
     document.getElementById("experiment-scenario").onchange = (event) => {
       selectedExperimentScenarioId = event.target.value || null;
     };

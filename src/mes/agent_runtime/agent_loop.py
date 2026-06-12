@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Mapping, Protocol
 
+from src.mes.agent_runtime.visual_artifacts import validate_visual_artifact
 from src.mes.process_tools.service import ProcessToolService
 
 
@@ -73,6 +74,7 @@ class MESAgentRuntime:
         ]
         max_steps = max(1, int(max_steps or 1))
         executed_calls: List[Dict[str, Any]] = []
+        visual_artifacts: List[Dict[str, Any]] = []
         agent_trace: List[Dict[str, Any]] = []
         last_response: Dict[str, Any] = {}
         last_answer = ""
@@ -105,6 +107,7 @@ class MESAgentRuntime:
                     "model": self.model_name,
                     "answer": answer,
                     "tool_calls": executed_calls,
+                    "visual_artifacts": visual_artifacts,
                     "agent_trace": agent_trace,
                     "raw_response": response,
                 }
@@ -146,6 +149,7 @@ class MESAgentRuntime:
                             "읽기 전용 조회/예측 도구만 허용됩니다."
                         ),
                         "tool_calls": executed_calls,
+                        "visual_artifacts": visual_artifacts,
                         "agent_trace": agent_trace,
                         "raw_response": response,
                     }
@@ -171,6 +175,8 @@ class MESAgentRuntime:
                 if error:
                     executed["error"] = error
                 executed_calls.append(executed)
+                if status == "executed":
+                    _append_visual_artifacts(visual_artifacts, result)
                 agent_trace.append(
                     {
                         "type": "tool_call",
@@ -192,6 +198,7 @@ class MESAgentRuntime:
                         "model": self.model_name,
                         "answer": f"{tool_name} 실행 중 오류가 발생했습니다: {error}",
                         "tool_calls": executed_calls,
+                        "visual_artifacts": visual_artifacts,
                         "agent_trace": agent_trace,
                         "raw_response": response,
                     }
@@ -211,6 +218,7 @@ class MESAgentRuntime:
             "model": self.model_name,
             "answer": answer,
             "tool_calls": executed_calls,
+            "visual_artifacts": visual_artifacts,
             "agent_trace": agent_trace,
             "raw_response": last_response,
         }
@@ -334,6 +342,25 @@ def _extract_tool_calls(message: Mapping[str, Any]) -> List[Dict[str, Any]]:
             }
         ]
     return []
+
+
+def _append_visual_artifacts(
+    collected: List[Dict[str, Any]],
+    tool_result: Mapping[str, Any],
+) -> None:
+    known_ids = {str(item.get("artifact_id", "")) for item in collected}
+    for raw_artifact in tool_result.get("visual_artifacts", []) or []:
+        if not isinstance(raw_artifact, Mapping):
+            continue
+        try:
+            artifact = validate_visual_artifact(raw_artifact)
+        except ValueError:
+            continue
+        artifact_id = str(artifact.get("artifact_id", ""))
+        if not artifact_id or artifact_id in known_ids:
+            continue
+        collected.append(artifact)
+        known_ids.add(artifact_id)
 
 
 def _fallback_answer(executed_calls: List[Dict[str, Any]]) -> str:

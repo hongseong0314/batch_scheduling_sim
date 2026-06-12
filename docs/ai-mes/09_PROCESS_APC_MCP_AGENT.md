@@ -1,7 +1,7 @@
 # Process APC MCP Agent V1
 
 Status: implemented V1
-Last updated: 2026-05-31
+Last updated: 2026-06-12
 
 ## Reader
 
@@ -20,7 +20,7 @@ Process APC MCP Agent V1 lets a process engineer ask a natural-language MES/APC
 question and have a local LLM call read-only process and runtime inspection
 tools. The standalone process-model API starts with Process A APC prediction.
 Agent Mode additionally exposes the A/B/C layered decision tools used by the
-MES policy stack.
+MES policy stack and generic equipment visual analytics tools.
 
 V1 is intentionally read-only. It predicts, compares, and explains. It does not
 apply recipes, update MES records, dispatch lots, or execute equipment commands.
@@ -90,8 +90,11 @@ flowchart TD
   AgentLoop --> Registry["read-only MES tool registry"]
   Registry --> APC["A/B/C APC and policy tools"]
   Registry --> Runtime["fab state / policy / trace tools"]
+  Registry --> Visual["equipment telemetry tools"]
   APC --> ToolResult["structured tool result"]
   Runtime --> ToolResult
+  Visual --> Artifact["typed visual artifact"]
+  Artifact --> ToolResult
   ToolResult --> AgentLoop
   AgentLoop --> Answer["engineer-facing answer"]
 ```
@@ -143,6 +146,9 @@ Compatibility details:
 | `src/mes/agent_runtime/mcp_client.py` | Synchronous MCP stdio client wrapper |
 | `src/mes/agent_runtime/layered_process_tools.py` | A/B/C L1 candidate and L2 annotation tools for Agent Mode |
 | `src/mes/agent_runtime/mes_tools.py` | Read-only MES runtime and layered process tool registry for Agent Mode |
+| `src/mes/runtime/equipment_telemetry.py` | Generic A/B/C quality, utilization, throughput, alarm, and anomaly queries |
+| `src/mes/agent_runtime/visual_tools.py` | Generic visual analytics tool schemas and execution |
+| `src/mes/agent_runtime/visual_artifacts.py` | Typed, deterministic, non-executable artifact construction and validation |
 | `src/mes/agent_runtime/agent_loop.py` | Multi-step Agent/Chat loop, tool policy, and final response generation |
 | `src/mes/agent_runtime/process_chat.py` | Chat facade with LLM mode and local A APC fallback |
 | `src/mes/agent_runtime/run_store.py` | Recent agent run records for inspector/debug APIs |
@@ -223,6 +229,20 @@ candidates; L2 tools expose APC/process implication for those candidates. L3/L4
 selection remains separate and can be inspected through policy, portfolio, and
 trace tools.
 
+Equipment visual analytics tools:
+
+```text
+list_equipment_metrics
+query_equipment_timeseries
+query_equipment_anomalies
+```
+
+These tools are generic across configured A/B/C equipment. They accept
+canonical ids such as `A_0` or display names such as `LITHO-01`. Supported V1
+metrics are `quality`, `utilization`, `throughput`, `alarm`, and `anomaly`.
+`alarm` is observed source evidence; `anomaly` is a derived condition such as
+quality outside its target window.
+
 ## REST API
 
 ```http
@@ -258,7 +278,8 @@ Every chat request creates an `agent_run_id`. The run record stores:
 - requested Ollama think flag,
 - final status and answer,
 - tool calls,
-- compact step trace.
+- compact step trace,
+- typed visual artifacts returned by successful visual tool calls.
 
 When the chat service runs inside the MES API process, these records are stored
 in the same local SQLite file as the MES runtime (`MES_DB_PATH`, default
@@ -297,9 +318,16 @@ opens `/mes#chat` and renders:
 - an LLM toggle,
 - a model selector built from the Continue-style `models` config,
 - the read-only MES/API tool context,
-- starter A APC, A L1/L2, C packing, and Fab state questions,
+- starter equipment trend, alarm/anomaly, A L1/L2, and C packing questions,
 - tool-call metadata and compact agent trace with layer, operation id, and
-  policy id for returned tool calls.
+  policy id for returned tool calls,
+- a resizable Active Inspector for server-validated visual artifacts.
+
+Desktop visual analysis uses a 40:60 Chat/Inspector split. Chart, Data, and
+Events tabs show the same artifact evidence. On mobile the inspector opens as a
+full-screen drawer. The model never supplies HTML, JavaScript, SQL, or arbitrary
+chart expressions; the browser maps allowlisted artifact types to built-in SVG
+renderers.
 
 The AI Developer Console also includes Agent Run Inspector. It lists recent
 agent runs from `/api/v2/agent-runs`, lets developers select one run, and shows
@@ -316,6 +344,7 @@ sequenceDiagram
   participant Gate as "Read-only tool policy"
   participant Runtime as "MES runtime tools"
   participant APC as "A/B/C process tools"
+  participant Visual as "Equipment analytics tools"
   participant Store as "Agent run store"
 
   User->>UI: Ask process or MES question
@@ -325,12 +354,14 @@ sequenceDiagram
   Agent->>Gate: validate requested tools
   Gate->>Runtime: inspect fab, policy, trace, equipment
   Gate->>APC: predict or annotate process candidates
+  Gate->>Visual: query telemetry or anomaly evidence
   Runtime-->>Agent: structured tool result
   APC-->>Agent: structured tool result
+  Visual-->>Agent: structured result plus typed artifact
   Agent->>Model: append tool evidence
   Model-->>Agent: final explanation
-  Agent->>Store: persist run, tool calls, step trace
-  Agent-->>UI: answer and compact trace
+  Agent->>Store: persist run, tool calls, step trace, artifacts
+  Agent-->>UI: answer, compact trace, visual artifacts
 ```
 
 Tool execution is deliberately narrower than a general coding agent. The MES

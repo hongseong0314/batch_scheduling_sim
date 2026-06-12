@@ -161,22 +161,62 @@
             </div>
             <span id="chat-status">ready</span>
           </div>
-          <div class="chat-layout">
-            <div class="chat-thread" id="chat-thread" aria-live="polite"></div>
-            <aside class="chat-context">
-              <div class="panel-header compact-header"><h2>Agent Tools</h2><span>read-only</span></div>
-              <div class="point-detail">
-                <div><span>Runtime</span><strong>MES snapshot · policy · trace</strong></div>
-                <div><span>L1</span><strong>A/B dispatch · C packing candidates</strong></div>
-                <div><span>L2</span><strong>A/B APC · C pack quality annotation</strong></div>
-                <div><span>Policy</span><strong>non-write tools only</strong></div>
+          <div class="chat-workspace" id="chat-workspace">
+            <div class="chat-primary">
+              <div class="chat-layout">
+                <div class="chat-thread" id="chat-thread" aria-live="polite"></div>
+                <aside class="chat-context">
+                  <div class="panel-header compact-header"><h2>Agent Tools</h2><span>read-only</span></div>
+                  <div class="point-detail">
+                    <div><span>Runtime</span><strong>MES snapshot · policy · trace</strong></div>
+                    <div><span>L1</span><strong>A/B dispatch · C packing candidates</strong></div>
+                    <div><span>L2</span><strong>A/B APC · C pack quality annotation</strong></div>
+                    <div><span>Visual</span><strong>quality · utilization · throughput · alarms</strong></div>
+                    <div><span>Policy</span><strong>non-write tools only</strong></div>
+                  </div>
+                  <div class="chat-examples">
+                    <button class="button compact chat-example" type="button" data-message="LITHO-01의 최근 15일 품질, 가동률, 처리량 그래프를 보여줘">Equipment trend</button>
+                    <button class="button compact chat-example" type="button" data-message="LITHO-01의 최근 15일 알람과 품질 이상 이력을 보여줘">Alarm / anomaly</button>
+                    <button class="button compact chat-example" type="button" data-message="현재 A 공정 L1 후보와 L2 APC annotation을 보고 어떤 batch가 좋은지 설명해줘">A L1/L2</button>
+                    <button class="button compact chat-example" type="button" data-message="현재 C packing 후보를 material/color grouping 기준으로 비교하고 품질 위험을 설명해줘">C pack</button>
+                  </div>
+                </aside>
               </div>
-              <div class="chat-examples">
-                <button class="button compact chat-example" type="button" data-message="A 공정에서 spec_a 48~53이고 u=6, m_age=12, recipe=[10,2,1]이면 QA가 어떻게 나올까?">A APC QA</button>
-                <button class="button compact chat-example" type="button" data-message="현재 A 공정 L1 후보와 L2 APC annotation을 보고 어떤 batch가 좋은지 설명해줘">A L1/L2</button>
-                <button class="button compact chat-example" type="button" data-message="현재 C packing 후보를 material/color grouping 기준으로 비교하고 품질 위험을 설명해줘">C pack</button>
-                <button class="button compact chat-example" type="button" data-message="현재 fab 상태와 active policy stack을 보고 어떤 공정이 병목인지 설명해줘">Fab state</button>
+            </div>
+            <div
+              class="chat-inspector-divider"
+              id="chat-inspector-divider"
+              role="separator"
+              aria-label="Resize chat and active inspector"
+              aria-orientation="vertical"
+              tabindex="0"
+              hidden
+            ></div>
+            <aside class="chat-active-inspector" id="chat-active-inspector" aria-label="Active visual inspector" hidden>
+              <div class="chat-inspector-header">
+                <div>
+                  <span class="section-kicker">Active Inspector</span>
+                  <h3 id="chat-inspector-title">No visual artifact</h3>
+                  <p id="chat-inspector-scope">Ask for equipment telemetry to open an analysis artifact.</p>
+                </div>
+                <div class="chat-inspector-actions">
+                  <button class="button compact" id="chat-inspector-pin" type="button" aria-pressed="false" title="Keep the current artifact active">Pin</button>
+                  <button class="button compact" id="chat-inspector-expand" type="button" aria-pressed="false" title="Use the full analysis workspace">Full</button>
+                  <button class="button compact" id="chat-inspector-close" type="button" title="Close active inspector">Close</button>
+                </div>
               </div>
+              <div class="chat-inspector-kpis" id="chat-inspector-kpis"></div>
+              <div class="chat-inspector-tabs" role="tablist" aria-label="Artifact views">
+                <button class="chat-inspector-tab active" type="button" role="tab" aria-selected="true" data-chat-inspector-tab="chart">Chart</button>
+                <button class="chat-inspector-tab" type="button" role="tab" aria-selected="false" data-chat-inspector-tab="data">Data</button>
+                <button class="chat-inspector-tab" type="button" role="tab" aria-selected="false" data-chat-inspector-tab="events">Events</button>
+              </div>
+              <div class="chat-inspector-content">
+                <section class="chat-inspector-view active" id="chat-inspector-chart" data-chat-inspector-view="chart"></section>
+                <section class="chat-inspector-view" id="chat-inspector-data" data-chat-inspector-view="data"></section>
+                <section class="chat-inspector-view" id="chat-inspector-events" data-chat-inspector-view="events"></section>
+              </div>
+              <div class="chat-inspector-provenance" id="chat-inspector-provenance"></div>
             </aside>
           </div>
           <form class="chat-form" id="chat-form">

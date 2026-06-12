@@ -133,6 +133,7 @@ class ProcessChatService:
                 answer=str(result.get("answer", "")),
                 tool_calls=list(result.get("tool_calls", [])),
                 agent_trace=list(result.get("agent_trace", [])),
+                visual_artifacts=list(result.get("visual_artifacts", [])),
                 duration_ms=duration_ms,
             )
             return {
@@ -142,6 +143,7 @@ class ProcessChatService:
                 "answer": result.get("answer", ""),
                 "tool_calls": result.get("tool_calls", []),
                 "agent_trace": result.get("agent_trace", []),
+                "visual_artifacts": result.get("visual_artifacts", []),
                 "model": result.get("model", "-"),
                 "fallback_used": False,
             }
@@ -178,6 +180,7 @@ class ProcessChatService:
                 ),
                 "tool_calls": [],
                 "agent_trace": [],
+                "visual_artifacts": [],
                 "model": "local-parser",
                 "fallback_used": False,
             }
@@ -214,6 +217,7 @@ class ProcessChatService:
                 }
             ],
             "agent_trace": [],
+            "visual_artifacts": [],
             "model": "local-parser",
             "fallback_used": False,
         }

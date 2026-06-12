@@ -1,7 +1,7 @@
 # AI MES Documentation Index
 
 Status: canonical navigation index
-Last updated: 2026-05-31
+Last updated: 2026-06-12
 
 This folder is the source of truth for the AI MES architecture, runtime,
 production-transition contracts, API, UI, and roadmap.
@@ -21,7 +21,7 @@ integration path, and UI reading path.
 | Reader | Read in this order |
 |---|---|
 | New reader / non-MES reader | `01 -> 02 -> 03 -> 04 -> 17` |
-| AI policy developer | `01 -> 03 -> 04 -> 05 -> 09 -> 16` |
+| AI policy developer | `01 -> 03 -> 04 -> 05 -> 09 -> 18 -> 16` |
 | Backend/API developer | `01 -> 05 -> 06 -> 07 -> 10 -> 17` |
 | UI developer | `01 -> 08 -> 07 -> 05 -> 17` |
 | Production integration engineer | `01 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15` |
@@ -74,6 +74,7 @@ AI MES recommends. Legacy MES decides whether and how to execute.
 | 15 | [15_PRODUCTION_MES_V1_GOALS.md](15_PRODUCTION_MES_V1_GOALS.md) | Product/architecture leads | Production MES V1 implemented axes and remaining boundary |
 | 16 | [16_IMPLEMENTATION_ROADMAP.md](16_IMPLEMENTATION_ROADMAP.md) | Project planners | Build phases, acceptance criteria, tests, migration strategy |
 | 17 | [17_CURRENT_IMPLEMENTATION_STATUS.md](17_CURRENT_IMPLEMENTATION_STATUS.md) | Everyone | Current implementation snapshot and what is not implemented |
+| 18 | [18_AGENT_VISUAL_ANALYTICS_V1.md](18_AGENT_VISUAL_ANALYTICS_V1.md) | Agent/UI developers | Generic equipment telemetry tools and typed Active Inspector artifacts |
 | 99 | [archive/README.md](archive/README.md) | Maintainers | Archived planning docs and supersession notes |
 
 ## Source Of Truth Rules

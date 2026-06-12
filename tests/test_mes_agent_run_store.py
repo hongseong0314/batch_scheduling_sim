@@ -32,6 +32,12 @@ def test_agent_run_store_creates_and_completes_run() -> None:
             {"type": "llm_response", "step": 1, "tool_call_count": 1},
             {"type": "tool_call", "step": 1, "tool_name": "get_fab_snapshot"},
         ],
+        visual_artifacts=[
+            {
+                "artifact_id": "VIZ_001",
+                "artifact_type": "equipment_timeseries",
+            }
+        ],
         duration_ms=123,
     )
 
@@ -42,6 +48,8 @@ def test_agent_run_store_creates_and_completes_run() -> None:
     assert detail["answer"] == "A가 병목입니다."
     assert detail["tool_count"] == 1
     assert detail["step_count"] == 2
+    assert detail["artifact_count"] == 1
+    assert detail["visual_artifacts"][0]["artifact_id"] == "VIZ_001"
     assert detail["metadata"]["requested_think"] is True
     assert detail["metadata"]["model_config"]["name"] == "Gemma4 Remote"
 

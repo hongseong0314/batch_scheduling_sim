@@ -1,6 +1,6 @@
 # MES Agent Visual Analytics V1
 
-Status: approved design
+Status: implemented V1
 Last updated: 2026-06-12
 
 ## Purpose
@@ -130,7 +130,9 @@ The tool returns structured data and a constrained display specification:
   "visualization": {
     "chart_type": "line",
     "x_field": "time",
-    "y_fields": ["quality"],
+    "y_field": "value",
+    "series_field": "equipment_id",
+    "metric_field": "metric",
     "target_bands": []
   },
   "provenance": {
@@ -143,6 +145,22 @@ The tool returns structured data and a constrained display specification:
 
 The browser renders only known artifact and chart types. Tool output cannot
 inject script, HTML, CSS, SQL, or arbitrary Vega expressions.
+
+## Implementation Map
+
+| Module | Responsibility |
+|---|---|
+| `src/mes/runtime/equipment_telemetry.py` | Generic A/B/C equipment resolution, metric catalog, time series, alarm/anomaly evidence |
+| `src/mes/agent_runtime/visual_tools.py` | Read-only Agent Mode tool schemas and execution |
+| `src/mes/agent_runtime/visual_artifacts.py` | Deterministic typed artifacts and data-only validation |
+| `src/mes/agent_runtime/agent_loop.py` | Artifact collection across multi-step tool calls |
+| `src/mes/agent_runtime/run_store.py` | Agent run artifact audit contract |
+| `src/mes/agent_runtime/sqlite_run_store.py` | Artifact persistence in the SQLite agent run payload |
+| `src/mes/ui/static/control_room.js` | Active Inspector rendering and interaction |
+
+The inspector does not execute chart code from the model. It maps the approved
+artifact fields to built-in SVG renderers for line, bar, and event-timeline
+views.
 
 ## Runtime Boundaries
 
@@ -181,4 +199,3 @@ flowchart LR
 6. Chart, Data, and Events views show the same artifact evidence.
 7. Source and time basis remain visible.
 8. Existing non-visual Agent Mode and MES behavior remain compatible.
-

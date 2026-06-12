@@ -68,6 +68,7 @@ class SQLiteAgentRunStore(AgentRunStore):
         tool_calls: list[Dict[str, Any]],
         agent_trace: list[Dict[str, Any]],
         duration_ms: int,
+        visual_artifacts: list[Dict[str, Any]] | None = None,
     ) -> None:
         super().complete_run(
             agent_run_id,
@@ -76,6 +77,7 @@ class SQLiteAgentRunStore(AgentRunStore):
             tool_calls=tool_calls,
             agent_trace=agent_trace,
             duration_ms=duration_ms,
+            visual_artifacts=visual_artifacts,
         )
         self._upsert_record(self._records[str(agent_run_id)])
 
@@ -214,6 +216,9 @@ def _record_from_payload(payload: Dict[str, Any]) -> AgentRunRecord:
         answer=str(payload.get("answer", "")),
         tool_calls=[dict(item) for item in payload.get("tool_calls", [])],
         agent_trace=[dict(item) for item in payload.get("agent_trace", [])],
+        visual_artifacts=[
+            dict(item) for item in payload.get("visual_artifacts", [])
+        ],
         created_at=str(payload.get("created_at", "")),
         completed_at=str(payload.get("completed_at", "")),
         duration_ms=int(payload.get("duration_ms", 0) or 0),

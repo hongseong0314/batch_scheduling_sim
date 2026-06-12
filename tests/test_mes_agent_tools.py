@@ -14,6 +14,9 @@ def test_mes_agent_tool_catalog_exposes_read_only_runtime_tools() -> None:
     assert "get_policy_stack" in by_name
     assert "get_candidate_portfolio_latest" in by_name
     assert "get_assignment_trace" in by_name
+    assert "list_equipment_metrics" in by_name
+    assert "query_equipment_timeseries" in by_name
+    assert "query_equipment_anomalies" in by_name
     assert "generate_process_a_l1_candidates" in by_name
     assert "generate_process_b_l1_candidates" in by_name
     assert "generate_process_c_l1_candidates" in by_name
@@ -23,6 +26,67 @@ def test_mes_agent_tool_catalog_exposes_read_only_runtime_tools() -> None:
     assert by_name["generate_process_c_l1_candidates"]["layer"] == "L1"
     assert by_name["annotate_process_c_l2_pack_quality"]["layer"] == "L2"
     assert all(tool["read_only"] is True for tool in catalog["tools"])
+
+
+def test_mes_agent_visual_tools_return_typed_equipment_artifacts() -> None:
+    context = MESAPIContext()
+    context.env.time = 20
+    context.env.env_A.event_log = [
+        {
+            "timestamp": 10,
+            "event_type": "task_completed",
+            "machine_id": "A_0",
+            "task_uids": [1, 2],
+            "quality_values": [49.0, 51.0],
+            "avg_quality": 50.0,
+            "target_specs": [
+                {"low": 48.0, "high": 53.0},
+                {"low": 48.0, "high": 53.0},
+            ],
+        },
+        {
+            "timestamp": 14,
+            "event_type": "equipment_alarm",
+            "machine_id": "A_0",
+            "alarm_code": "TEMP_HIGH",
+            "severity": "critical",
+        },
+    ]
+    service = MESAgentToolService(context)
+
+    catalog = service.run_tool(
+        "list_equipment_metrics",
+        {"equipment_ids": ["LITHO-01"]},
+    )
+    timeseries = service.run_tool(
+        "query_equipment_timeseries",
+        {
+            "equipment_ids": ["LITHO-01"],
+            "metrics": ["quality", "throughput"],
+            "time_range": {"type": "relative", "value": 15, "unit": "day"},
+            "aggregation": "daily",
+        },
+    )
+    anomalies = service.run_tool(
+        "query_equipment_anomalies",
+        {
+            "equipment_ids": ["A_0"],
+            "time_range": {"type": "relative", "value": 15, "unit": "day"},
+            "severity": ["warning", "critical"],
+        },
+    )
+
+    assert catalog["metrics"] == [
+        "quality",
+        "utilization",
+        "throughput",
+        "alarm",
+        "anomaly",
+    ]
+    assert timeseries["visual_artifacts"][0]["artifact_type"] == "equipment_timeseries"
+    assert timeseries["visual_artifacts"][0]["provenance"]["time_basis"] == "SIMULATION_STEP"
+    assert anomalies["visual_artifacts"][0]["artifact_type"] == "equipment_anomalies"
+    assert anomalies["observed_alarm_count"] == 1
 
 
 def test_mes_agent_tool_service_returns_compact_fab_snapshot() -> None:

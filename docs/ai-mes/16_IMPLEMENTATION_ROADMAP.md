@@ -1,7 +1,7 @@
 # Implementation Roadmap
 
 Status: canonical
-Last updated: 2026-05-31
+Last updated: 2026-06-12
 
 ## Reader
 
@@ -212,11 +212,12 @@ Acceptance:
 ## Phase 7: UI Expansion
 
 Status: implemented for Control Room Traceability V1, Candidate Portfolio
-Workbench V1, AI Developer Console V1, Policy Experiment Runner V1, and
-Assignment Trace Inspector V1. The control room shows L3 budget plan, selected
-and rejected candidate rows, L2 annotations, L3/L4 policy ids, A/B/C machine
-detail, Gantt drilldown, autoplay, generate lot, reset, offline policy
-experiment comparison, and assignment-level chain inspection.
+Workbench V1, AI Developer Console V1, Policy Experiment Runner V1,
+Assignment Trace Inspector V1, and MES Agent Visual Analytics V1. The control
+room shows L3 budget plan, selected and rejected candidate rows, L2 annotations,
+L3/L4 policy ids, A/B/C machine detail, Gantt drilldown, offline policy
+comparison, assignment-level chain inspection, and agent-requested equipment
+analytics.
 
 Delivered:
 
@@ -232,6 +233,10 @@ Delivered:
   replay, result comparison, and decision diff inspector,
 - Assignment Trace Inspector search and Gantt click-through from equipment/task
   assignment to L4 -> L3 -> L1 -> L2 -> Rule -> Command -> simulator action,
+- generic read-only equipment analytics tools for quality, utilization,
+  throughput, observed alarms, and derived anomalies,
+- typed visual artifacts persisted with Agent Run records,
+- 40:60 Chat/Active Inspector split with Chart, Data, and Events views,
 - C packing group-selection traceability,
 - selected local-score and upper-score metadata where available,
 - C machine detail,
@@ -505,8 +510,8 @@ Recommended next build order:
 3. Auth, roles, and production outbox submission for write-capable workflows.
 4. Full source-data quality dashboard for duplicate, late, missing, and
    conflicting events.
-5. Extend read-only Agent Mode tools from Process A APC to Process B APC and C
-   packing quality.
+5. Connect Agent Visual Analytics to canonical FDC/event-time telemetry,
+   preserving source/time provenance and simulator compatibility.
 6. Add approval-gated write-tool contract for future L4/operator workflows,
    keeping current `/mes#chat` default read-only.
 7. Scenario preset library and config controls for balanced/A-bottleneck/

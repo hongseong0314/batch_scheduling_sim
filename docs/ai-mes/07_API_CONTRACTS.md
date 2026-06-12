@@ -1,7 +1,7 @@
 # API Contracts
 
 Status: canonical
-Last updated: 2026-05-31
+Last updated: 2026-06-12
 
 ## Reader
 
@@ -62,6 +62,7 @@ legacy boundary".
 | operation registry and action proposal routes | `src/mes/runtime/production_boundary_api.py`, `src/mes/runtime/operations.py`, `src/mes/operations/registry.py` |
 | run and ledger index routes | `src/mes/runtime/run_ledger_api.py`, `src/mes/runtime/run_ledger.py` |
 | equipment detail | `src/mes/runtime/equipment_detail.py` |
+| equipment agent telemetry | `src/mes/runtime/equipment_telemetry.py` |
 | Gantt state | `src/mes/runtime/gantt.py` |
 
 ## Current Read APIs
@@ -426,7 +427,8 @@ POST /api/v2/process-chat
             "result": {"stage": "A", "quality_risk": "LOW"}
         }
     ],
-    "agent_trace": []
+    "agent_trace": [],
+    "visual_artifacts": []
 }
 ```
 
@@ -434,8 +436,53 @@ Agent Mode may return `mode="llm_agent"`, `status`, `agent_trace`, and multiple
 tool calls. The MES API process registers these read-only tools for Agent Mode:
 `predict_process_a_apc`, `get_fab_snapshot`, `get_policy_stack`,
 `get_candidate_portfolio_latest`, `get_equipment_detail`, and
-`get_assignment_trace`. Non-read-only or unknown tool calls are rejected with
+`get_assignment_trace`, plus the generic equipment analytics tools:
+
+```text
+list_equipment_metrics
+query_equipment_timeseries
+query_equipment_anomalies
+```
+
+The visual tools accept canonical equipment ids or configured display names and
+cover quality, utilization, throughput, observed alarm, and derived anomaly
+evidence across A/B/C equipment. A successful visual query returns one or more
+server-validated `visual_artifacts`. Non-read-only or unknown tool calls are rejected with
 `status="policy_blocked"` and `policy="excluded"`.
+
+Example artifact excerpt:
+
+```python
+{
+    "artifact_id": "VIZ_...",
+    "artifact_type": "equipment_timeseries",
+    "equipment_ids": ["A_0"],
+    "metrics": ["quality", "utilization", "throughput"],
+    "series": [
+        {
+            "equipment_id": "A_0",
+            "display_name": "LITHO-01",
+            "metric": "quality",
+            "time": 18,
+            "value": 50.4
+        }
+    ],
+    "visualization": {
+        "chart_type": "line",
+        "x_field": "time",
+        "y_field": "value",
+        "series_field": "equipment_id",
+        "metric_field": "metric",
+        "target_bands": [[48.0, 53.0]]
+    },
+    "provenance": {
+        "source": "SIMULATOR",
+        "time_basis": "SIMULATION_STEP",
+        "requested_range": "15 days",
+        "effective_range": "last 15 simulation periods"
+    }
+}
+```
 
 `GET /api/v2/agent-runs` and `GET /api/v2/agent-runs/{agent_run_id}` expose the
 inspection record created by each chat request. In the MES API process these
@@ -455,6 +502,7 @@ GET /api/v2/agent-runs/{agent_run_id}
     "answer": "A 공정이 병목입니다...",
     "tool_count": 2,
     "step_count": 5,
+    "artifact_count": 1,
     "metadata": {
         "model_name": "gemma4:latest",
         "provider": "ollama",
@@ -470,7 +518,8 @@ GET /api/v2/agent-runs/{agent_run_id}
     "agent_trace": [
         {"type": "llm_response", "step": 1, "tool_call_count": 1},
         {"type": "tool_call", "step": 1, "tool_name": "get_fab_snapshot"}
-    ]
+    ],
+    "visual_artifacts": [{"artifact_id": "VIZ_...", "artifact_type": "equipment_timeseries"}]
 }
 ```
 

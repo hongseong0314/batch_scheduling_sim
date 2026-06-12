@@ -1,7 +1,7 @@
 # UI Control Room Specification
 
 Status: canonical
-Last updated: 2026-05-31
+Last updated: 2026-06-12
 
 ## Reader
 
@@ -61,6 +61,10 @@ flowchart TD
 The UI separates operational views from developer/debug views. Operators should
 see status, WIP, equipment, and safe proposals. AI developers should see policy
 ids, candidate portfolios, scores, traces, and tool calls.
+
+Process engineers use Process Chat for natural-language inspection. Visual
+equipment questions open a typed Active Inspector rather than injecting charts
+into the message body.
 
 ## Product Shell Direction
 
@@ -283,6 +287,21 @@ Mobile:
 - horizontally scrollable tables,
 - vertical decision chain.
 
+Process Chat visual analysis:
+
+```text
+Desktop:
+  Chat 40% | resizable divider | Active Inspector 60%
+
+Mobile:
+  Chat -> full-screen Active Inspector drawer
+```
+
+The inspector provides Chart, Data, and Events tabs over the same immutable
+artifact. It exposes source, time basis, requested range, and effective range.
+Pin keeps the current artifact active while new chat turns run; Full expands
+the analysis pane; Close returns to the normal Chat workspace.
+
 Reusable product primitives:
 
 - `page-shell`: page-level surface and scope.
@@ -329,6 +348,10 @@ Current implementation:
   and APC questions. It supports Agent Mode, Chat Mode, LLM/fallback execution,
   model selection, max-step control, read-only MES/APC tools, returned tool-call
   metadata, and a compact agent trace.
+- Process Chat also supports generic A/B/C equipment analytics for quality,
+  utilization, throughput, observed alarms, and derived anomalies. A returned
+  typed artifact opens a resizable Active Inspector with Chart, Data, and
+  Events tabs. The browser renders only approved artifact/chart types.
 - Agent Run Inspector shows recent `agent_run_id` records, model/provider,
   status, question, final answer, tool calls, requested think mode, prompt
   version, and step timeline from `/api/v2/agent-runs`. In the MES API process,
@@ -370,6 +393,8 @@ Next UI milestone:
    implications.
 3. Show selected group separately from selected pack.
 4. Add operator-facing Rule Engine consistency and rejection detail.
+5. Add production event-time aggregation and export controls to the Active
+   Inspector after canonical FDC telemetry is available.
 
 ## UX Copy Rules
 
@@ -400,7 +425,7 @@ Avoid vague phrases:
 | Assignment trace | `/api/v2/assignment-trace`, `/api/v2/gantt` trace keys | same plus richer persisted genealogy linkage |
 | Genealogy | `/api/v2/runs`, `/api/v2/ledger-index/{index_name}`, `/api/v2/genealogy/task/{task_uid}`, `/api/v2/genealogy/equipment/{equipment_id}`, `/api/v2/genealogy/lot/{lot_id}`, `/api/v2/execution-ledger/{correlation_id}`, `/api/v2/digital-twin/state-at` | event-sourced reconstruction |
 | AI developer console | `/api/v2/ai-dev/policy-stack`, `/api/v2/ai-dev/decision-cycles`, `/api/v2/ai-dev/candidate-portfolio/{correlation_id}`, `/api/v2/ai-dev/scenarios`, `/api/v2/ai-dev/policy-variants`, `/api/v2/ai-dev/experiments/*` | same plus scenario preset library |
-| Process chat | `/api/v2/process-chat`, `/api/v2/process-tools/catalog`, `/api/v2/process-tools/{tool_id}/run`, `/api/v2/agent-runs` | same plus B APC, C packing tools, and optional approval-gated write tools |
+| Process chat | `/api/v2/process-chat`, `/api/v2/process-tools/catalog`, `/api/v2/process-tools/{tool_id}/run`, `/api/v2/agent-runs` | same plus production telemetry adapters and optional approval-gated write tools |
 | Decision chain | `/api/v2/decision-chain/{correlation_id}` | same with portfolio metadata |
 | Rule gate | `/api/v1/rules/validate` | same plus layer consistency reasons |
 | Command preview | `/api/v1/commands/track-in/preview` | `/api/v1/commands/finalize` |

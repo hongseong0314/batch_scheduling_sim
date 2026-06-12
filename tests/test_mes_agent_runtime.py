@@ -273,3 +273,109 @@ def test_agent_runtime_supports_system_message_tool_fallback() -> None:
     assert result["tool_calls"][0]["tool_name"] == "get_fab_snapshot"
     assert llm.calls[0]["tools"] == []
     assert "Available MES tools" in llm.calls[0]["messages"][0]["content"]
+
+
+class VisualToolLLMClient:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def chat(self, messages, tools):
+        self.calls.append({"messages": messages, "tools": tools})
+        if len(self.calls) == 1:
+            return {
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "call_visual",
+                            "type": "function",
+                            "function": {
+                                "name": "query_equipment_timeseries",
+                                "arguments": {},
+                            },
+                        }
+                    ],
+                }
+            }
+        return {
+            "message": {
+                "role": "assistant",
+                "content": "LITHO-01 품질 그래프를 열었습니다.",
+            }
+        }
+
+
+class FakeVisualToolService:
+    artifact = {
+        "artifact_id": "VIZ_TEST",
+        "artifact_type": "equipment_timeseries",
+        "title": "LITHO-01 · Quality",
+        "equipment_ids": ["A_0"],
+        "metrics": ["quality"],
+        "window": {"start": 0, "end": 15},
+        "series": [],
+        "events": [],
+        "summary": {},
+        "visualization": {
+            "chart_type": "line",
+            "x_field": "time",
+            "y_field": "value",
+            "series_field": "equipment_id",
+            "metric_field": "metric",
+            "target_bands": [],
+        },
+        "provenance": {
+            "source": "SIMULATOR",
+            "time_basis": "SIMULATION_STEP",
+            "query_tool": "query_equipment_timeseries",
+            "requested_range": "15 days",
+            "effective_range": "last 15 simulation periods",
+        },
+    }
+
+    def catalog(self):
+        return {
+            "tools": [
+                {
+                    "id": "query_equipment_timeseries",
+                    "name": "query_equipment_timeseries",
+                    "description": "Query equipment telemetry.",
+                    "read_only": True,
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ]
+        }
+
+    def openai_tools(self):
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_equipment_timeseries",
+                    "description": "Query equipment telemetry.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        ]
+
+    def run_tool(self, tool_id, arguments):
+        return {
+            "series": [],
+            "visual_artifacts": [dict(self.artifact), dict(self.artifact)],
+        }
+
+
+def test_agent_runtime_collects_and_deduplicates_visual_artifacts() -> None:
+    runtime = MESAgentRuntime(
+        llm_client=VisualToolLLMClient(),
+        tool_service=FakeVisualToolService(),
+        model_name="visual-agent",
+    )
+
+    result = runtime.run("LITHO-01 품질 그래프를 보여줘", mode="agent", max_steps=3)
+
+    assert result["status"] == "completed"
+    assert result["answer"] == "LITHO-01 품질 그래프를 열었습니다."
+    assert result["visual_artifacts"] == [FakeVisualToolService.artifact]
+    assert result["tool_calls"][0]["result"]["visual_artifacts"]

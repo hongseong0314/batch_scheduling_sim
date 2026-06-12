@@ -109,6 +109,12 @@ class FakeRuntime:
             "answer": "agent answer",
             "tool_calls": [{"tool_name": "get_fab_snapshot", "status": "executed"}],
             "agent_trace": [{"type": "llm_response"}, {"type": "tool_call"}],
+            "visual_artifacts": [
+                {
+                    "artifact_id": "VIZ_CHAT",
+                    "artifact_type": "equipment_timeseries",
+                }
+            ],
         }
 
 
@@ -136,6 +142,7 @@ def test_process_chat_passes_agent_mode_and_max_steps_to_runtime(monkeypatch) ->
     assert result["status"] == "completed"
     assert result["agent_run_id"].startswith("ARUN_")
     assert result["agent_trace"][1]["type"] == "tool_call"
+    assert result["visual_artifacts"][0]["artifact_id"] == "VIZ_CHAT"
     stored = ProcessChatService().agent_runs.get_run(result["agent_run_id"])
     assert stored["found"] is False
 
@@ -199,8 +206,23 @@ def test_control_room_mounts_chat_page_and_nav() -> None:
     assert 'id="chat-model"' in html
     assert 'id="chat-mode"' in html
     assert 'id="chat-max-steps"' in html
+    assert 'id="chat-active-inspector"' in html
+    assert 'id="chat-inspector-chart"' in html
+    assert 'id="chat-inspector-data"' in html
+    assert 'id="chat-inspector-events"' in html
+    assert 'id="chat-inspector-divider"' in html
     assert 'id="ai-dev-agent-run-body"' in html
     assert 'id="ai-dev-agent-run-detail"' in html
     assert "/api/v2/process-chat/models" in html
     assert "/api/v2/process-chat" in html
     assert "/api/v2/agent-runs" in html
+
+
+def test_control_room_chat_script_supports_visual_artifacts_and_inspector_actions() -> None:
+    html = client.get("/mes").text
+
+    assert "visual_artifacts: payload.visual_artifacts || []" in html
+    assert "activateChatArtifact" in html
+    assert "renderChatInspector" in html
+    assert "chat-inspector-open" in html
+    assert "chat-inspector-fullscreen" in html

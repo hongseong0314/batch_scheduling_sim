@@ -26,6 +26,12 @@ def test_sqlite_agent_run_store_reloads_completed_run(tmp_path) -> None:
         answer="A가 병목입니다.",
         tool_calls=[{"tool_name": "get_fab_snapshot", "status": "executed"}],
         agent_trace=[{"type": "tool_call", "tool_name": "get_fab_snapshot"}],
+        visual_artifacts=[
+            {
+                "artifact_id": "VIZ_SQLITE",
+                "artifact_type": "equipment_timeseries",
+            }
+        ],
         duration_ms=321,
     )
 
@@ -41,6 +47,7 @@ def test_sqlite_agent_run_store_reloads_completed_run(tmp_path) -> None:
     assert detail["metadata"]["requested_think"] is True
     assert detail["metadata"]["model_config"]["name"] == "Gemma4 Remote"
     assert detail["tool_calls"][0]["tool_name"] == "get_fab_snapshot"
+    assert detail["visual_artifacts"][0]["artifact_id"] == "VIZ_SQLITE"
     assert listing["items"][0]["agent_run_id"] == run.agent_run_id
 
 

@@ -31,6 +31,7 @@ class AgentRunRecord:
     answer: str = ""
     tool_calls: List[Dict[str, Any]] = field(default_factory=list)
     agent_trace: List[Dict[str, Any]] = field(default_factory=list)
+    visual_artifacts: List[Dict[str, Any]] = field(default_factory=list)
     created_at: str = field(default_factory=_now_iso)
     completed_at: str = ""
     duration_ms: int = 0
@@ -46,6 +47,7 @@ class AgentRunRecord:
             "answer": self.answer,
             "tool_count": len(self.tool_calls),
             "step_count": len(self.agent_trace),
+            "artifact_count": len(self.visual_artifacts),
             "created_at": self.created_at,
             "completed_at": self.completed_at,
             "duration_ms": self.duration_ms,
@@ -63,6 +65,7 @@ class AgentRunRecord:
         if include_steps:
             payload["tool_calls"] = list(self.tool_calls)
             payload["agent_trace"] = list(self.agent_trace)
+            payload["visual_artifacts"] = list(self.visual_artifacts)
         return payload
 
 
@@ -117,12 +120,16 @@ class AgentRunStore:
         tool_calls: List[Dict[str, Any]],
         agent_trace: List[Dict[str, Any]],
         duration_ms: int,
+        visual_artifacts: List[Dict[str, Any]] | None = None,
     ) -> None:
         record = self._records[str(agent_run_id)]
         record.status = str(status)
         record.answer = str(answer)
         record.tool_calls = [dict(item) for item in tool_calls]
         record.agent_trace = [dict(item) for item in agent_trace]
+        record.visual_artifacts = [
+            dict(item) for item in (visual_artifacts or [])
+        ]
         record.completed_at = _now_iso()
         record.duration_ms = int(duration_ms)
 

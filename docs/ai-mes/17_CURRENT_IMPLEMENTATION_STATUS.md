@@ -1,7 +1,7 @@
 # Current Implementation Status
 
 Status: canonical implementation snapshot
-Last updated: 2026-05-31
+Last updated: 2026-06-12
 
 ## Reader
 
@@ -58,7 +58,7 @@ manufacturing control system.
 | Runtime APIs | Live state, Gantt, equipment detail, decision chain, assignment trace, genealogy, candidate portfolio, AI dev, experiments |
 | Store | In-memory store plus SQLite JSON payload and normalized ledger indexes |
 | UI | `/mes` control room with Fab, Flow/Gantt, Equipment, Machine Detail, Decision Chain, Assignment Trace, Candidate Portfolio, AI Dev Console, Chat, Events |
-| Agent tools | Read-only MES/APC chat agent with Continue-style config, Ollama/OpenAI-compatible providers, tool-use loop, agent run inspector |
+| Agent tools | Read-only MES/APC chat agent with Continue-style config, Ollama/OpenAI-compatible providers, A/B/C layered tools, generic equipment telemetry/anomaly tools, typed visual artifacts, Active Inspector, and agent run audit |
 | Production boundary | Operation registry, source key mapping, ingestion contracts, production schema/data-quality diagnostics, canonical twin replay/genealogy, action proposal boundary, review-gated proposal workflow |
 
 ## Current Default Policy Stack
@@ -120,6 +120,8 @@ Remaining gaps:
 - learning-based policy training and model deployment,
 - production MES/RMS/FDC/ERP adapters hardened against late, duplicate, missing,
   and conflicting source events.
+- production event-time telemetry adapter for Agent Visual Analytics; current
+  visual queries read simulator event logs and label the time basis explicitly.
 
 ## Current Boundary
 

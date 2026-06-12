@@ -10,6 +10,11 @@ from src.mes.agent_runtime.layered_process_tools import (
     layered_process_tool_catalog,
     run_layered_process_tool,
 )
+from src.mes.agent_runtime.visual_tools import (
+    VISUAL_TOOL_IDS,
+    run_visual_tool,
+    visual_tool_catalog,
+)
 from src.mes.process_tools.service import ProcessToolService
 from src.mes.runtime.ai_dev import policy_stack_payload
 from src.mes.runtime.assignment_trace import assignment_trace
@@ -33,6 +38,7 @@ class MESAgentToolService:
         tools = list(self.process_tools.catalog()["tools"])
         if self.context is not None:
             tools.extend(layered_process_tool_catalog(self.context))
+            tools.extend(visual_tool_catalog())
         tools.extend(self._runtime_tool_catalog())
         return {"count": len(tools), "tools": tools}
 
@@ -59,6 +65,10 @@ class MESAgentToolService:
             if self.context is None:
                 raise ValueError(f"MES_RUNTIME_CONTEXT_NOT_CONFIGURED:{name}")
             return run_layered_process_tool(self.context, name, arguments)
+        if name in VISUAL_TOOL_IDS:
+            if self.context is None:
+                raise ValueError(f"MES_RUNTIME_CONTEXT_NOT_CONFIGURED:{name}")
+            return run_visual_tool(self.context, name, arguments)
         if self.context is None:
             raise ValueError(f"MES_RUNTIME_CONTEXT_NOT_CONFIGURED:{name}")
         if name == "get_fab_snapshot":

@@ -216,6 +216,15 @@ def test_control_room_mounts_chat_page_and_nav() -> None:
     assert "/api/v2/process-chat/models" in html
     assert "/api/v2/process-chat" in html
     assert "/api/v2/agent-runs" in html
+    assert html.count('class="button compact chat-example"') == 7
+    assert (
+        'data-message="A 공정에서 spec_a 48~53이고 u=6, m_age=12, '
+        'recipe=[10,2,1]이면 QA가 어떻게 나올까?">A recipe QA</button>'
+    ) in html
+    assert (
+        'data-message="현재 fab 상태와 active policy stack을 분석해서 공정별 WIP, '
+        '가동 상태, 병목과 근거를 설명해줘">Fab analysis</button>'
+    ) in html
 
 
 def test_control_room_chat_script_supports_visual_artifacts_and_inspector_actions() -> None:

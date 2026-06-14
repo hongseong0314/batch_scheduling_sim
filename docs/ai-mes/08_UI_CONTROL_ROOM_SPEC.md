@@ -432,3 +432,33 @@ Avoid vague phrases:
 | Event timeline | `/api/v1/events` | same plus simulator event linkage |
 | Gantt | `/api/v2/gantt` | same |
 | Machine detail | `/api/v2/equipment/{id}/detail` | A/B/C detail coverage |
+
+## Process A Spatial Quality Inspector
+
+`process_a_spatial_quality` artifacts use a process-specific view inside the
+existing Chat Active Inspector.
+
+```text
+Chart
+  circular 17 x 17 canonical product grid
+  PASS / margin / OOS-low / OOS-high verdict colors
+  scalar verdict versus map verdict
+  mean, standard deviation, OOS ratio, min/max
+  edge-center delta and largest OOS cluster
+  radial, directional, hotspot, and local-noise factors
+
+Data
+  row, column, normalized x/y
+  QA value, verdict, margin, zone
+
+Events
+  LOCAL_OOS_CLUSTER
+  EDGE_NON_UNIFORMITY
+  DIRECTIONAL_BIAS
+  CONSUMABLE_HOTSPOT
+```
+
+The provenance footer displays `SIMULATOR`, `SIMULATION_STEP`,
+`SIMULATED_SPATIAL_QUALITY`, and the spatial model id/version. The browser owns
+the grid renderer and verdict colors. The LLM and tool payload cannot inject
+HTML, SVG, CSS, JavaScript, or chart expressions.

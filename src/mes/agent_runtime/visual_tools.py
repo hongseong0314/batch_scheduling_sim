@@ -6,6 +6,7 @@ from typing import Any, Dict, Mapping
 
 from src.mes.agent_runtime.visual_artifacts import (
     build_anomaly_artifact,
+    build_process_a_spatial_quality_artifact,
     build_timeseries_artifact,
 )
 from src.mes.runtime.equipment_telemetry import (
@@ -13,12 +14,16 @@ from src.mes.runtime.equipment_telemetry import (
     query_equipment_anomalies,
     query_equipment_timeseries,
 )
+from src.mes.runtime.process_quality_maps import (
+    query_process_a_spatial_quality,
+)
 
 
 VISUAL_TOOL_IDS = (
     "list_equipment_metrics",
     "query_equipment_timeseries",
     "query_equipment_anomalies",
+    "query_process_a_spatial_quality",
 )
 
 
@@ -119,6 +124,32 @@ def visual_tool_catalog() -> list[Dict[str, Any]]:
                 required=["equipment_ids", "time_range"],
             ),
         },
+        {
+            "id": "query_process_a_spatial_quality",
+            "name": "query_process_a_spatial_quality",
+            "read_only": True,
+            "description": (
+                "Return the latest or task-specific simulated spatial quality "
+                "map for Process A equipment. Use this for product-surface, "
+                "wafer-style, local OOS, edge-uniformity, or hotspot questions. "
+                "At least one of equipment_id or task_uid is required."
+            ),
+            "input_schema": _object_schema(
+                {
+                    "equipment_id": {
+                        "type": "string",
+                        "description": (
+                            "Process A canonical equipment id or display name, "
+                            "for example A_0 or LITHO-01."
+                        ),
+                    },
+                    "task_uid": {
+                        "type": "integer",
+                        "description": "Optional exact completed Process A task uid.",
+                    },
+                },
+            ),
+        },
     ]
 
 
@@ -158,6 +189,23 @@ def run_visual_tool(
                 build_anomaly_artifact(payload, query_tool=name)
             ],
         }
+    if name == "query_process_a_spatial_quality":
+        payload = query_process_a_spatial_quality(
+            context,
+            equipment_id=_optional_string(arguments.get("equipment_id")),
+            task_uid=arguments.get("task_uid"),
+        )
+        if not payload.get("found"):
+            return {**payload, "visual_artifacts": []}
+        return {
+            **payload,
+            "visual_artifacts": [
+                build_process_a_spatial_quality_artifact(
+                    payload,
+                    query_tool=name,
+                )
+            ],
+        }
     raise ValueError(f"UNKNOWN_VISUAL_TOOL:{name}")
 
 
@@ -176,3 +224,7 @@ def _object_schema(
 def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
+
+def _optional_string(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    return normalized or None

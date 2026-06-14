@@ -362,6 +362,13 @@ class FakeVisualToolService:
     def run_tool(self, tool_id, arguments):
         return {
             "series": [],
+            "spatial_quality": {
+                "summary": {"mean": 50.1, "oos_ratio": 0.02},
+                "cells": [
+                    {"row": 0, "column": 0, "value": 50.1, "verdict": "PASS"},
+                    {"row": 0, "column": 1, "value": 46.9, "verdict": "OOS_LOW"},
+                ],
+            },
             "visual_artifacts": [dict(self.artifact), dict(self.artifact)],
         }
 
@@ -379,3 +386,7 @@ def test_agent_runtime_collects_and_deduplicates_visual_artifacts() -> None:
     assert result["answer"] == "LITHO-01 품질 그래프를 열었습니다."
     assert result["visual_artifacts"] == [FakeVisualToolService.artifact]
     assert result["tool_calls"][0]["result"]["visual_artifacts"]
+    tool_message = runtime.llm_client.calls[1]["messages"][-1]
+    assert '"visual_artifacts"' not in tool_message["content"]
+    assert '"cells"' not in tool_message["content"]
+    assert '"cell_count": 2' in tool_message["content"]

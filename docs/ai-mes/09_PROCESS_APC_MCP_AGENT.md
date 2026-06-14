@@ -462,3 +462,32 @@ Not allowed in V1:
 
 Future write-capable tools must be separated from read-only tools and routed
 through operator approval and the rule engine.
+
+## Process A Spatial Quality Tool
+
+The live MES Agent tool catalog also exposes:
+
+```text
+query_process_a_spatial_quality
+```
+
+This read-only tool resolves `A_0`/`LITHO-01` and completed task UIDs against
+Process A completion evidence. It returns a deterministic simulated product
+surface map and a `process_a_spatial_quality` visual artifact.
+
+Example question:
+
+```text
+LITHO-01에서 가장 최근 완료된 제품의 공간 품질 판정 맵을 보여줘.
+```
+
+The spatial model keeps the existing scalar QA as the map mean, then adds
+feature-driven radial, directional, consumable-hotspot, and local-noise
+components. The response is always labeled:
+
+```text
+SIMULATED_SPATIAL_QUALITY
+```
+
+It is not FDC, metrology, vision, or wafer-bin evidence. Process A scalar
+pass/fail and rework behavior remain unchanged in V1.

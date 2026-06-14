@@ -142,3 +142,22 @@ Recommendation
 -> legacy MES acceptance
 -> observed execution outcome
 ```
+
+## Process A Spatial Quality Map V1
+
+Process A completion evidence now includes a deterministic synthetic spatial
+quality field. The existing `realized_qa_A` scalar remains the execution and
+rework verdict. The map adds local OOS, margin, edge-uniformity, directional,
+and consumable-hotspot evidence for explanation and future policy evaluation.
+
+Implemented surfaces:
+
+- pure `PROCESS_A_SPATIAL_FIELD` model version `1.0.0`,
+- full map on Process A completion events,
+- compact summary/model reference in task history,
+- `query_process_a_spatial_quality` read-only Agent tool,
+- `process_a_spatial_quality` typed artifact,
+- Active Inspector Chart/Data/Events rendering,
+- explicit `SIMULATED_SPATIAL_QUALITY` provenance.
+
+Process B spatial quality remains a future process-specific implementation.

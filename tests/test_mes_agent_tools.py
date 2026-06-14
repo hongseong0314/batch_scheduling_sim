@@ -1,3 +1,4 @@
+from src.environment.process_a_env import ProcessA_Env
 from src.mes.agent_runtime.mes_tools import MESAgentToolService
 from src.mes.runtime.context import MESAPIContext
 from src.objects import Task
@@ -17,6 +18,7 @@ def test_mes_agent_tool_catalog_exposes_read_only_runtime_tools() -> None:
     assert "list_equipment_metrics" in by_name
     assert "query_equipment_timeseries" in by_name
     assert "query_equipment_anomalies" in by_name
+    assert "query_process_a_spatial_quality" in by_name
     assert "generate_process_a_l1_candidates" in by_name
     assert "generate_process_b_l1_candidates" in by_name
     assert "generate_process_c_l1_candidates" in by_name
@@ -87,6 +89,38 @@ def test_mes_agent_visual_tools_return_typed_equipment_artifacts() -> None:
     assert timeseries["visual_artifacts"][0]["provenance"]["time_basis"] == "SIMULATION_STEP"
     assert anomalies["visual_artifacts"][0]["artifact_type"] == "equipment_anomalies"
     assert anomalies["observed_alarm_count"] == 1
+
+
+def test_mes_agent_spatial_quality_tool_returns_latest_a_map_artifact() -> None:
+    context = MESAPIContext()
+    context.env.env_A = ProcessA_Env(
+        {
+            "num_machines_A": 1,
+            "process_time_A": 1,
+            "batch_size_A": 1,
+            "deterministic_mode": True,
+        }
+    )
+    task = Task(uid=7, job_id="JOB", due_date=20, spec_a=(45.0, 55.0))
+    context.env.env_A.add_tasks([task])
+    context.env.env_A.step(
+        0,
+        {"A_0": {"task_uids": [7], "recipe": [10.0, 2.0, 1.0]}},
+    )
+    context.env.env_A.step(1)
+    service = MESAgentToolService(context)
+
+    payload = service.run_tool(
+        "query_process_a_spatial_quality",
+        {"equipment_id": "LITHO-01"},
+    )
+
+    assert payload["found"] is True
+    assert payload["task_uid"] == 7
+    artifact = payload["visual_artifacts"][0]
+    assert artifact["artifact_type"] == "process_a_spatial_quality"
+    assert artifact["visualization"]["chart_type"] == "spatial_quality_map"
+    assert artifact["provenance"]["evidence_type"] == "SIMULATED_SPATIAL_QUALITY"
 
 
 def test_mes_agent_tool_service_returns_compact_fab_snapshot() -> None:

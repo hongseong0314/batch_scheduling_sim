@@ -207,7 +207,11 @@ class MESAgentRuntime:
                         "role": "tool",
                         "tool_call_id": call.get("tool_call_id", f"call_{step}"),
                         "name": tool_name,
-                        "content": json.dumps(result, ensure_ascii=False, sort_keys=True),
+                        "content": json.dumps(
+                            _compact_tool_result_for_llm(result),
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
                     }
                 )
 
@@ -342,6 +346,19 @@ def _extract_tool_calls(message: Mapping[str, Any]) -> List[Dict[str, Any]]:
             }
         ]
     return []
+
+
+def _compact_tool_result_for_llm(result: Mapping[str, Any]) -> Dict[str, Any]:
+    """Keep visual payloads in the API result without echoing them into the LLM."""
+    payload = dict(result)
+    payload.pop("visual_artifacts", None)
+    spatial_quality = payload.get("spatial_quality")
+    if isinstance(spatial_quality, Mapping):
+        compact_spatial = dict(spatial_quality)
+        cells = compact_spatial.pop("cells", [])
+        compact_spatial["cell_count"] = len(cells) if isinstance(cells, list) else 0
+        payload["spatial_quality"] = compact_spatial
+    return payload
 
 
 def _append_visual_artifacts(

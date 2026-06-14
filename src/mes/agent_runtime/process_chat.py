@@ -25,7 +25,7 @@ from src.mes.process_tools.service import ProcessToolService
 DEFAULT_AGENT_CONFIG = Path("config/mes-process-agent.yaml")
 AGENT_PROMPT_ID = "MES_AGENT_SYSTEM_PROMPT"
 AGENT_PROMPT_VERSION = "0.1.0"
-TOOL_CATALOG_VERSION = "mes-agent-tools-v1"
+TOOL_CATALOG_VERSION = "mes-agent-tools-v2"
 
 
 class ProcessChatService:

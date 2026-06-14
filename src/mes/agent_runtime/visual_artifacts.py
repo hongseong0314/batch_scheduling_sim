@@ -8,8 +8,12 @@ from copy import deepcopy
 from typing import Any, Dict, Iterable, Mapping
 
 
-ARTIFACT_TYPES = {"equipment_timeseries", "equipment_anomalies"}
-CHART_TYPES = {"line", "bar", "event_timeline"}
+ARTIFACT_TYPES = {
+    "equipment_timeseries",
+    "equipment_anomalies",
+    "process_a_spatial_quality",
+}
+CHART_TYPES = {"line", "bar", "event_timeline", "spatial_quality_map"}
 VISUALIZATION_FIELDS = {
     "chart_type",
     "x_field",
@@ -20,6 +24,10 @@ VISUALIZATION_FIELDS = {
     "time_field",
     "severity_field",
     "label_field",
+    "grid_field",
+    "value_field",
+    "verdict_field",
+    "coordinate_fields",
 }
 UNSAFE_TEXT_MARKERS = ("<script", "</script", "javascript:", "data:text/html")
 
@@ -90,6 +98,70 @@ def build_anomaly_artifact(
     return validate_visual_artifact(artifact)
 
 
+def build_process_a_spatial_quality_artifact(
+    payload: Mapping[str, Any],
+    *,
+    query_tool: str = "query_process_a_spatial_quality",
+) -> Dict[str, Any]:
+    spatial_quality = deepcopy(dict(payload.get("spatial_quality") or {}))
+    display_name = str(
+        payload.get("display_name")
+        or payload.get("equipment_id")
+        or "Process A"
+    )
+    task_uid = payload.get("task_uid")
+    spec = dict(spatial_quality.get("spec") or {})
+    low = spec.get("low")
+    high = spec.get("high")
+    target_bands = (
+        [[float(low), float(high)]]
+        if low is not None and high is not None
+        else []
+    )
+    reason_codes = [
+        str(value) for value in spatial_quality.get("reason_codes", [])
+    ]
+    artifact = {
+        "artifact_type": "process_a_spatial_quality",
+        "title": f"{display_name} · Task {task_uid} · Spatial Quality",
+        "equipment_ids": [str(payload.get("equipment_id") or "")],
+        "metrics": ["spatial_quality"],
+        "window": {
+            "start": int(payload.get("completion_time", 0) or 0),
+            "end": int(payload.get("completion_time", 0) or 0),
+        },
+        "series": [],
+        "events": [
+            {
+                "event_id": f"SPATIAL-{task_uid}-{index}",
+                "equipment_id": str(payload.get("equipment_id") or ""),
+                "display_name": display_name,
+                "time": int(payload.get("completion_time", 0) or 0),
+                "evidence_class": "DERIVED_SPATIAL_QUALITY",
+                "code": code,
+                "severity": (
+                    "critical" if code == "LOCAL_OOS_CLUSTER" else "warning"
+                ),
+                "message": _spatial_reason_message(code),
+            }
+            for index, code in enumerate(reason_codes)
+        ],
+        "summary": deepcopy(dict(spatial_quality.get("summary") or {})),
+        "spatial_quality": spatial_quality,
+        "visualization": {
+            "chart_type": "spatial_quality_map",
+            "grid_field": "spatial_quality.cells",
+            "value_field": "value",
+            "verdict_field": "verdict",
+            "coordinate_fields": ["x", "y"],
+            "target_bands": target_bands,
+        },
+        "provenance": _provenance(payload, query_tool),
+    }
+    artifact["artifact_id"] = _artifact_id(artifact)
+    return validate_visual_artifact(artifact)
+
+
 def validate_visual_artifact(artifact: Mapping[str, Any]) -> Dict[str, Any]:
     payload = deepcopy(dict(artifact))
     artifact_type = str(payload.get("artifact_type", ""))
@@ -111,13 +183,34 @@ def validate_visual_artifact(artifact: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def _provenance(payload: Mapping[str, Any], query_tool: str) -> Dict[str, Any]:
-    return {
+    provenance = {
         "source": str(payload.get("source") or "UNKNOWN"),
         "time_basis": str(payload.get("time_basis") or "UNKNOWN"),
         "query_tool": str(query_tool),
         "requested_range": str(payload.get("requested_range") or ""),
         "effective_range": str(payload.get("effective_range") or ""),
     }
+    evidence_type = payload.get("evidence_type")
+    if evidence_type:
+        provenance["evidence_type"] = str(evidence_type)
+    spatial_quality = payload.get("spatial_quality")
+    if isinstance(spatial_quality, Mapping):
+        model = spatial_quality.get("model")
+        if isinstance(model, Mapping):
+            provenance["model_id"] = str(model.get("model_id") or "")
+            provenance["model_version"] = str(model.get("version") or "")
+            provenance["seed"] = int(model.get("seed", 0) or 0)
+    return provenance
+
+
+def _spatial_reason_message(code: str) -> str:
+    messages = {
+        "LOCAL_OOS_CLUSTER": "One or more connected spatial cells are outside specification.",
+        "EDGE_NON_UNIFORMITY": "Edge and center quality means differ beyond the model threshold.",
+        "DIRECTIONAL_BIAS": "Recipe-dependent directional variation is present.",
+        "CONSUMABLE_HOTSPOT": "Consumable usage contributes a localized quality hotspot.",
+    }
+    return messages.get(code, "Derived spatial quality condition.")
 
 
 def _timeseries_title(
@@ -203,4 +296,3 @@ def _validate_data_only(value: Any) -> None:
     if value is None or isinstance(value, (bool, int, float)):
         return
     raise ValueError(f"UNSUPPORTED_ARTIFACT_VALUE:{type(value).__name__}")
-

@@ -226,3 +226,7 @@ def test_control_room_chat_script_supports_visual_artifacts_and_inspector_action
     assert "renderChatInspector" in html
     assert "chat-inspector-open" in html
     assert "chat-inspector-fullscreen" in html
+    assert "process_a_spatial_quality" in html
+    assert "spatial_quality_map" in html
+    assert "renderSpatialQualityMap" in html
+    assert "SIMULATED_SPATIAL_QUALITY" in html

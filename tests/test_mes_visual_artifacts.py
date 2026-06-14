@@ -2,8 +2,12 @@ import pytest
 
 from src.mes.agent_runtime.visual_artifacts import (
     build_anomaly_artifact,
+    build_process_a_spatial_quality_artifact,
     build_timeseries_artifact,
     validate_visual_artifact,
+)
+from src.environment.process_a_spatial_quality import (
+    generate_process_a_spatial_quality,
 )
 
 
@@ -146,3 +150,51 @@ def test_visual_artifact_rejects_non_data_payload_values() -> None:
 
     with pytest.raises(ValueError, match="UNSAFE_ARTIFACT_TEXT"):
         validate_visual_artifact(artifact)
+
+
+def test_process_a_spatial_artifact_preserves_map_and_simulator_provenance() -> None:
+    spatial = {
+        "task_uid": 184,
+        "equipment_id": "A_0",
+        "completion_time": 20,
+        "recipe": [10.0, 2.0, 1.0],
+        "machine_state": {"u": 8, "m_age": 80},
+        **generate_process_a_spatial_quality(
+            scalar_qa=49.2,
+            spec=(45.0, 55.0),
+            recipe=[10.0, 2.0, 1.0],
+            u=8,
+            m_age=80,
+            task_uid=184,
+            equipment_id="A_0",
+            completion_time=20,
+        ),
+    }
+    artifact = build_process_a_spatial_quality_artifact(
+        {
+            "found": True,
+            "source": "SIMULATOR",
+            "time_basis": "SIMULATION_STEP",
+            "evidence_type": "SIMULATED_SPATIAL_QUALITY",
+            "equipment_id": "A_0",
+            "display_name": "LITHO-01",
+            "task_uid": 184,
+            "completion_time": 20,
+            "spatial_quality": spatial,
+        }
+    )
+
+    assert artifact["artifact_type"] == "process_a_spatial_quality"
+    assert artifact["title"] == "LITHO-01 · Task 184 · Spatial Quality"
+    assert artifact["visualization"] == {
+        "chart_type": "spatial_quality_map",
+        "grid_field": "spatial_quality.cells",
+        "value_field": "value",
+        "verdict_field": "verdict",
+        "coordinate_fields": ["x", "y"],
+        "target_bands": [[45.0, 55.0]],
+    }
+    assert artifact["spatial_quality"]["summary"]["mean"] == pytest.approx(49.2)
+    assert artifact["provenance"]["evidence_type"] == "SIMULATED_SPATIAL_QUALITY"
+    assert artifact["provenance"]["model_id"] == "PROCESS_A_SPATIAL_FIELD"
+    assert artifact["provenance"]["model_version"] == "1.0.0"

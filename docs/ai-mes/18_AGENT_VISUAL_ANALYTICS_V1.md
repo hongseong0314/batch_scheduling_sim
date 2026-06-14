@@ -71,6 +71,12 @@ query_equipment_timeseries
 query_equipment_anomalies
 ```
 
+Process-specific quality visualization extends this catalog with:
+
+```text
+query_process_a_spatial_quality
+```
+
 Tools accept canonical equipment ids or configured display names. Comparison
 uses an `equipment_ids` array rather than equipment-specific tool names.
 
@@ -161,6 +167,48 @@ inject script, HTML, CSS, SQL, or arbitrary Vega expressions.
 The inspector does not execute chart code from the model. It maps the approved
 artifact fields to built-in SVG renderers for line, bar, and event-timeline
 views.
+
+## Process A Spatial Quality Extension
+
+Process A can return:
+
+```json
+{
+  "artifact_type": "process_a_spatial_quality",
+  "spatial_quality": {
+    "geometry": {
+      "shape": "CIRCLE",
+      "grid_size": 17,
+      "coordinate_system": "NORMALIZED_CARTESIAN"
+    },
+    "cells": [],
+    "summary": {
+      "mean": 49.2,
+      "std": 1.84,
+      "oos_ratio": 0.073,
+      "scalar_passed": true,
+      "map_passed": false
+    }
+  },
+  "visualization": {
+    "chart_type": "spatial_quality_map",
+    "grid_field": "spatial_quality.cells",
+    "value_field": "value",
+    "verdict_field": "verdict",
+    "coordinate_fields": ["x", "y"]
+  },
+  "provenance": {
+    "source": "SIMULATOR",
+    "time_basis": "SIMULATION_STEP",
+    "evidence_type": "SIMULATED_SPATIAL_QUALITY",
+    "model_id": "PROCESS_A_SPATIAL_FIELD",
+    "model_version": "1.0.0"
+  }
+}
+```
+
+The existing scalar QA is preserved as the map mean. The map is a simulated
+process-specific quality explanation, not observed spatial metrology.
 
 ## Runtime Boundaries
 

@@ -539,6 +539,78 @@ Canonical ids (`A`, `B`, `C`, `A_0`, `B_0`, `C_0`) remain the values used for
 policy decisions, Rule Engine validation, command payloads, and simulator
 actions.
 
+### Process A Spatial Quality Tool
+
+Agent Mode exposes the read-only tool:
+
+```text
+query_process_a_spatial_quality
+```
+
+It accepts a Process A equipment id/display name, a completed task UID, or both:
+
+```json
+{
+  "equipment_id": "LITHO-01",
+  "task_uid": 184
+}
+```
+
+When `task_uid` is omitted, the latest completed map for the equipment is
+returned. When `equipment_id` is omitted, the runtime searches Process A
+completion evidence for the task. Process B/C equipment is rejected in V1.
+
+Successful responses include:
+
+```json
+{
+  "found": true,
+  "read_only": true,
+  "source": "SIMULATOR",
+  "time_basis": "SIMULATION_STEP",
+  "evidence_type": "SIMULATED_SPATIAL_QUALITY",
+  "equipment_id": "A_0",
+  "display_name": "LITHO-01",
+  "task_uid": 184,
+  "completion_time": 20,
+  "spatial_quality": {
+    "scalar_qa": 49.2,
+    "geometry": {
+      "shape": "CIRCLE",
+      "grid_size": 17,
+      "coordinate_system": "NORMALIZED_CARTESIAN"
+    },
+    "cells": [],
+    "summary": {
+      "mean": 49.2,
+      "std": 1.84,
+      "oos_ratio": 0.073,
+      "largest_oos_cluster": 6,
+      "scalar_passed": true,
+      "map_passed": false
+    },
+    "reason_codes": ["LOCAL_OOS_CLUSTER", "CONSUMABLE_HOTSPOT"],
+    "model": {
+      "model_id": "PROCESS_A_SPATIAL_FIELD",
+      "version": "1.0.0",
+      "evidence_type": "SIMULATED_SPATIAL_QUALITY"
+    }
+  },
+  "visual_artifacts": [
+    {
+      "artifact_type": "process_a_spatial_quality",
+      "visualization": {
+        "chart_type": "spatial_quality_map"
+      }
+    }
+  ]
+}
+```
+
+The existing `realized_qa_A` scalar and scalar pass/rework result remain the
+Process A execution contract in V1. The map is additional simulated local-risk
+evidence.
+
 `GET /api/v2/operations` returns the active operation/equipment registry. A/B/C
 are default simulator operations today, but the contract is shaped for future
 production operations loaded from route and equipment master data.

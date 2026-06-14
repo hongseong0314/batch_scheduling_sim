@@ -3,6 +3,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from src.environment.process_a_spatial_quality import (
+    generate_process_a_spatial_quality,
+)
 from src.objects import ProcessA_Machine, Task
 
 # Physical model constants.
@@ -161,11 +164,46 @@ class ProcessA_Env:
             task_uids = [t.uid for t in finished_batch]
             quality_values: List[float] = []
             target_specs: List[Dict[str, Any]] = []
+            spatial_quality_maps: List[Dict[str, Any]] = []
             pass_count = 0
             fail_count = 0
 
             for task in finished_batch:
-                if self._run_qa_check(machine, recipe_used, task, current_time):
+                passed = self._run_qa_check(
+                    machine,
+                    recipe_used,
+                    task,
+                    current_time,
+                )
+                spatial_quality = {
+                    "task_uid": task.uid,
+                    "equipment_id": machine.id,
+                    "completion_time": current_time,
+                    "recipe": list(recipe_used),
+                    "machine_state": {
+                        "u": getattr(machine, "u", 0),
+                        "m_age": getattr(machine, "m_age", 0),
+                    },
+                    **generate_process_a_spatial_quality(
+                        scalar_qa=float(task.realized_qa_A),
+                        spec=task.spec_a,
+                        recipe=recipe_used,
+                        u=getattr(machine, "u", 0),
+                        m_age=getattr(machine, "m_age", 0),
+                        task_uid=task.uid,
+                        equipment_id=machine.id,
+                        completion_time=current_time,
+                    ),
+                }
+                task.history[-1]["spatial_quality_summary"] = dict(
+                    spatial_quality["summary"]
+                )
+                task.history[-1]["spatial_quality_model"] = dict(
+                    spatial_quality["model"]
+                )
+                spatial_quality_maps.append(spatial_quality)
+
+                if passed:
                     succeeded_tasks.append(task)
                     self.stats["total_passed"] += 1
                     pass_count += 1
@@ -209,6 +247,7 @@ class ProcessA_Env:
                     "u": getattr(machine, "u", 0),
                     "m_age": getattr(machine, "m_age", 0),
                     "target_specs": target_specs,
+                    "spatial_quality_maps": spatial_quality_maps,
                 }
             )
 

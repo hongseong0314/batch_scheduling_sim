@@ -236,6 +236,10 @@
       if (result.predicted_qa !== undefined) {
         return `predicted_qa ${result.predicted_qa} · risk ${result.quality_risk || "-"}`;
       }
+      if (result.evidence_type === "SIMULATED_SPATIAL_QUALITY") {
+        const summary = result.spatial_quality?.summary || {};
+        return `${result.display_name || result.equipment_id || "Process A"} · task ${result.task_uid ?? "-"} · mean ${formatArtifactValue("quality", summary.mean)} · OOS ${Math.round(Number(summary.oos_ratio || 0) * 1000) / 10}%`;
+      }
       if (result.visual_artifacts || (result.source && result.metrics)) {
         return `${(result.equipment_ids || []).join(", ") || "equipment"} · ${(result.metrics || []).join(", ") || "telemetry"} · ${(result.series || []).length} points · ${result.effective_range || "-"}`;
       }
@@ -260,8 +264,17 @@
     }
 
     function registerChatArtifacts(artifacts) {
-      const supportedTypes = new Set(["equipment_timeseries", "equipment_anomalies"]);
-      const supportedCharts = new Set(["line", "bar", "event_timeline"]);
+      const supportedTypes = new Set([
+        "equipment_timeseries",
+        "equipment_anomalies",
+        "process_a_spatial_quality",
+      ]);
+      const supportedCharts = new Set([
+        "line",
+        "bar",
+        "event_timeline",
+        "spatial_quality_map",
+      ]);
       (artifacts || []).forEach(artifact => {
         if (!artifact || !artifact.artifact_id || !supportedTypes.has(artifact.artifact_type)) return;
         if (!supportedCharts.has(artifact.visualization?.chart_type)) return;
@@ -329,6 +342,8 @@
       document.getElementById("chat-inspector-provenance").innerHTML = [
         `<strong>Source:</strong> ${escapeText(provenance.source || "UNKNOWN")}`,
         `<strong>Time:</strong> ${escapeText(provenance.time_basis || "UNKNOWN")}`,
+        `<strong>Evidence:</strong> ${escapeText(provenance.evidence_type || "-")}`,
+        `<strong>Model:</strong> ${escapeText([provenance.model_id, provenance.model_version].filter(Boolean).join(" · ") || "-")}`,
         `<strong>Requested:</strong> ${escapeText(provenance.requested_range || "-")}`,
         `<strong>Effective:</strong> ${escapeText(provenance.effective_range || "-")}`,
         `<strong>Tool:</strong> ${escapeText(provenance.query_tool || "-")}`,
@@ -359,6 +374,21 @@
     function renderArtifactKpis(artifact) {
       const events = artifactEvents(artifact);
       const summary = artifact.summary || {};
+      if (artifact.artifact_type === "process_a_spatial_quality") {
+        const items = [
+          ["Map mean", formatArtifactValue("quality", summary.mean)],
+          ["Uniformity σ", formatArtifactValue("quality", summary.std)],
+          ["OOS ratio", `${Math.round(Number(summary.oos_ratio || 0) * 1000) / 10}%`],
+          ["Min / Max", `${formatArtifactValue("quality", summary.minimum)} / ${formatArtifactValue("quality", summary.maximum)}`],
+          ["Edge-center Δ", formatArtifactValue("quality", summary.edge_center_delta)],
+          ["Largest cluster", summary.largest_oos_cluster || 0],
+        ];
+        return items.map(([label, value]) => `
+          <div class="chat-inspector-kpi">
+            <span>${escapeText(label)}</span>
+            <strong>${escapeText(value)}</strong>
+          </div>`).join("");
+      }
       const oosCount = Object.values(summary).reduce((total, equipmentSummary) => {
         const quality = equipmentSummary && typeof equipmentSummary === "object"
           ? equipmentSummary.quality
@@ -388,6 +418,10 @@
     function renderChatInspectorChart(artifact) {
       const target = document.getElementById("chat-inspector-chart");
       const chartType = artifact.visualization?.chart_type;
+      if (chartType === "spatial_quality_map") {
+        target.innerHTML = renderSpatialQualityMap(artifact);
+        return;
+      }
       if (chartType === "event_timeline") {
         target.innerHTML = renderEventTimelineChart(artifact);
         return;
@@ -405,6 +439,94 @@
       target.innerHTML = `<div class="chat-inspector-chart">${metrics.map(metric =>
         renderMetricChart(artifact, metric, chartType)
       ).join("")}</div>`;
+    }
+
+    function renderSpatialQualityMap(artifact) {
+      const spatial = artifact.spatial_quality || {};
+      const geometry = spatial.geometry || {};
+      const summary = spatial.summary || {};
+      const components = spatial.components || {};
+      const cells = spatial.cells || [];
+      const gridSize = Math.max(1, Number(geometry.grid_size || 17));
+      if (!cells.length) {
+        return "<div class='empty-state'>No spatial quality cells were returned.</div>";
+      }
+      const verdictClass = verdict => {
+        const normalized = String(verdict || "").toLowerCase();
+        return ["pass", "margin", "oos_low", "oos_high"].includes(normalized)
+          ? normalized.replace("_", "-")
+          : "unknown";
+      };
+      const cellHtml = cells.map(cell => {
+        const row = Math.max(0, Number(cell.row || 0)) + 1;
+        const column = Math.max(0, Number(cell.column || 0)) + 1;
+        const label = [
+          `x=${formatArtifactValue("coordinate", cell.x)}`,
+          `y=${formatArtifactValue("coordinate", cell.y)}`,
+          `QA=${formatArtifactValue("quality", cell.value)}`,
+          String(cell.verdict || "-"),
+          String(cell.zone || "-"),
+        ].join(" · ");
+        return `<div
+          class="spatial-quality-cell ${verdictClass(cell.verdict)}"
+          style="grid-row:${row};grid-column:${column}"
+          title="${escapeText(label)}"
+          aria-label="${escapeText(label)}"
+        ></div>`;
+      }).join("");
+      const scalarVerdict = summary.scalar_passed ? "PASS" : "FAIL";
+      const mapVerdict = summary.map_passed ? "PASS" : "RISK";
+      const reasonCodes = spatial.reason_codes || [];
+      return `<div class="spatial-quality-layout">
+        <section class="spatial-quality-map-panel">
+          <div class="spatial-quality-verdict">
+            <span>Scalar ${escapeText(scalarVerdict)}</span>
+            <strong>Map ${escapeText(mapVerdict)}</strong>
+          </div>
+          <div class="spatial-quality-grid-wrap">
+            <div
+              class="spatial-quality-grid"
+              style="grid-template-columns:repeat(${gridSize},1fr);grid-template-rows:repeat(${gridSize},1fr)"
+              role="img"
+              aria-label="Process A simulated spatial quality verdict map"
+            >${cellHtml}</div>
+          </div>
+          <div class="chat-inspector-legend spatial-quality-legend">
+            <span><i class="spatial-legend-pass"></i>PASS</span>
+            <span><i class="spatial-legend-margin"></i>Margin</span>
+            <span><i class="spatial-legend-oos-low"></i>OOS low</span>
+            <span><i class="spatial-legend-oos-high"></i>OOS high</span>
+          </div>
+        </section>
+        <aside class="spatial-quality-explanation">
+          <div>
+            <span class="section-kicker">SIMULATED_SPATIAL_QUALITY</span>
+            <h3>Position-level assessment</h3>
+            <p>Scalar QA remains the Process A execution verdict. The map exposes simulated local risk that the scalar average cannot show.</p>
+          </div>
+          <dl class="spatial-quality-components">
+            <div><dt>Radial</dt><dd>${escapeText(formatArtifactValue("quality", components.radial_amplitude))}</dd></div>
+            <div><dt>Directional</dt><dd>${escapeText(formatArtifactValue("quality", components.directional_amplitude))}</dd></div>
+            <div><dt>Hotspot</dt><dd>${escapeText(formatArtifactValue("quality", components.hotspot_amplitude))}</dd></div>
+            <div><dt>Local noise</dt><dd>${escapeText(formatArtifactValue("quality", components.noise_amplitude))}</dd></div>
+          </dl>
+          <div class="spatial-quality-reasons">
+            ${reasonCodes.length
+              ? reasonCodes.map(code => `<div><strong>${escapeText(code)}</strong><span>${escapeText(spatialReasonText(code))}</span></div>`).join("")
+              : "<div><strong>NO_LOCAL_RISK</strong><span>No derived spatial risk crossed the model thresholds.</span></div>"}
+          </div>
+        </aside>
+      </div>`;
+    }
+
+    function spatialReasonText(code) {
+      const messages = {
+        LOCAL_OOS_CLUSTER: "Connected positions are outside the task specification.",
+        EDGE_NON_UNIFORMITY: "Edge and center means differ beyond the model threshold.",
+        DIRECTIONAL_BIAS: "The recipe contributes a directional quality gradient.",
+        CONSUMABLE_HOTSPOT: "Consumable usage contributes a localized low-quality region.",
+      };
+      return messages[code] || "Derived spatial quality condition.";
     }
 
     function renderMetricChart(artifact, metric, chartType) {
@@ -528,6 +650,10 @@
 
     function renderChatInspectorData(artifact) {
       const target = document.getElementById("chat-inspector-data");
+      if (artifact.artifact_type === "process_a_spatial_quality") {
+        renderSpatialQualityData(target, artifact);
+        return;
+      }
       const points = artifact.series || [];
       if (!points.length) {
         target.innerHTML = "<div class='empty-state'>This artifact has no numeric series. Open Events for evidence rows.</div>";
@@ -542,6 +668,27 @@
           <td>${escapeText(formatArtifactValue(point.metric, point.value))}</td>
           <td>${escapeText(point.unit || "-")}</td>
           <td>${escapeText(point.sample_count ?? "-")}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+    }
+
+    function renderSpatialQualityData(target, artifact) {
+      const cells = artifact.spatial_quality?.cells || [];
+      if (!cells.length) {
+        target.innerHTML = "<div class='empty-state'>No spatial quality cells were returned.</div>";
+        return;
+      }
+      target.innerHTML = `<div class="table-wrap"><table class="chat-inspector-table">
+        <thead><tr><th>Row</th><th>Column</th><th>X</th><th>Y</th><th>QA</th><th>Verdict</th><th>Margin</th><th>Zone</th></tr></thead>
+        <tbody>${cells.map(cell => `<tr>
+          <td>${escapeText(cell.row ?? "-")}</td>
+          <td>${escapeText(cell.column ?? "-")}</td>
+          <td>${escapeText(formatArtifactValue("coordinate", cell.x))}</td>
+          <td>${escapeText(formatArtifactValue("coordinate", cell.y))}</td>
+          <td><strong>${escapeText(formatArtifactValue("quality", cell.value))}</strong></td>
+          <td><span class="${statusClass(String(cell.verdict || "").startsWith("OOS") ? "FAIL" : cell.verdict)}">${escapeText(cell.verdict || "-")}</span></td>
+          <td>${escapeText(formatArtifactValue("quality", cell.margin))}</td>
+          <td>${escapeText(cell.zone || "-")}</td>
         </tr>`).join("")}</tbody>
       </table></div>`;
     }

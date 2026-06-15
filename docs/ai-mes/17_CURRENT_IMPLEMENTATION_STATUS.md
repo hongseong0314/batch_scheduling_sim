@@ -143,21 +143,23 @@ Recommendation
 -> observed execution outcome
 ```
 
-## Process A Spatial Quality Map V1
+## Process Quality Intelligence V1
 
-Process A completion evidence now includes a deterministic synthetic spatial
-quality field. The existing `realized_qa_A` scalar remains the execution and
-rework verdict. The map adds local OOS, margin, edge-uniformity, directional,
-and consumable-hotspot evidence for explanation and future policy evaluation.
+Process A and B completion evidence now use a common provider-driven
+`QualityEvidence` envelope. Existing `realized_qa_A`/`realized_qa_B` scalar
+results remain the execution and rework verdicts. The maps add operation-
+specific local-risk evidence for explanation and future policy evaluation.
 
 Implemented surfaces:
 
-- pure `PROCESS_A_SPATIAL_FIELD` model version `1.0.0`,
-- full map on Process A completion events,
+- provider registry for operation A/B quality evidence,
+- pure `PROCESS_A_SPATIAL_FIELD` and `PROCESS_B_CLEANING_FIELD` models,
+- full evidence on A/B completion events,
 - compact summary/model reference in task history,
+- generic `query_process_quality_evidence` read-only Agent tool,
 - `query_process_a_spatial_quality` read-only Agent tool,
+- `process_quality_evidence` typed artifact,
 - `process_a_spatial_quality` typed artifact,
 - Active Inspector Chart/Data/Events rendering,
-- explicit `SIMULATED_SPATIAL_QUALITY` provenance.
-
-Process B spatial quality remains a future process-specific implementation.
+- explicit A `SIMULATED_SPATIAL_QUALITY` and B
+  `SIMULATED_CLEANING_QUALITY` provenance.

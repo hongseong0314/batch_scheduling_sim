@@ -235,13 +235,18 @@ Equipment visual analytics tools:
 list_equipment_metrics
 query_equipment_timeseries
 query_equipment_anomalies
+query_process_quality_evidence
+query_process_a_spatial_quality
 ```
 
-These tools are generic across configured A/B/C equipment. They accept
-canonical ids such as `A_0` or display names such as `LITHO-01`. Supported V1
-metrics are `quality`, `utilization`, `throughput`, `alarm`, and `anomaly`.
-`alarm` is observed source evidence; `anomaly` is a derived condition such as
-quality outside its target window.
+The metric and anomaly tools are generic across configured A/B/C equipment.
+They accept canonical ids such as `A_0` or display names such as `LITHO-01`.
+Supported V1 metrics are `quality`, `utilization`, `throughput`, `alarm`, and
+`anomaly`. `alarm` is observed source evidence; `anomaly` is a derived condition
+such as quality outside its target window. `query_process_quality_evidence`
+uses the provider registry and currently supports A and B. The
+`query_process_a_spatial_quality` tool remains as an A-only compatibility
+surface.
 
 ## REST API
 
@@ -463,31 +468,36 @@ Not allowed in V1:
 Future write-capable tools must be separated from read-only tools and routed
 through operator approval and the rule engine.
 
-## Process A Spatial Quality Tool
+## Process Quality Evidence Tools
 
 The live MES Agent tool catalog also exposes:
 
 ```text
+query_process_quality_evidence
 query_process_a_spatial_quality
 ```
 
-This read-only tool resolves `A_0`/`LITHO-01` and completed task UIDs against
-Process A completion evidence. It returns a deterministic simulated product
-surface map and a `process_a_spatial_quality` visual artifact.
+The generic tool resolves configured A/B equipment and completed task UIDs
+against process completion evidence. It returns a deterministic simulated
+quality field and a `process_quality_evidence` artifact. The A-only tool remains
+as a compatibility alias for existing clients and artifacts.
 
 Example question:
 
 ```text
 LITHO-01에서 가장 최근 완료된 제품의 공간 품질 판정 맵을 보여줘.
+CLEAN-01에서 가장 최근 세정된 제품의 잔류 오염과 세정 균일도 맵을 보여줘.
 ```
 
-The spatial model keeps the existing scalar QA as the map mean, then adds
-feature-driven radial, directional, consumable-hotspot, and local-noise
-components. The response is always labeled:
+The common envelope keeps scalar QA as the map mean and separates scalar and
+map verdicts. Process-specific providers supply different components:
 
 ```text
-SIMULATED_SPATIAL_QUALITY
+A: radial + directional + consumable hotspot + local noise
+B: edge residue + flow-direction bias + solution hotspot + local noise
 ```
 
-It is not FDC, metrology, vision, or wafer-bin evidence. Process A scalar
-pass/fail and rework behavior remain unchanged in V1.
+Evidence is explicitly labeled `SIMULATED_SPATIAL_QUALITY` for A and
+`SIMULATED_CLEANING_QUALITY` for B. It is not FDC, metrology, vision, or
+wafer-bin evidence. Existing A/B scalar pass/fail and rework behavior remain
+unchanged.

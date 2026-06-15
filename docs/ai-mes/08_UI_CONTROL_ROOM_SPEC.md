@@ -352,6 +352,11 @@ Current implementation:
   utilization, throughput, observed alarms, and derived anomalies. A returned
   typed artifact opens a resizable Active Inspector with Chart, Data, and
   Events tabs. The browser renders only approved artifact/chart types.
+- Process Chat quality-map analysis uses the common
+  `process_quality_evidence` artifact. A renders spatial pattern risk; B renders
+  residual-contamination and cleaning-uniformity risk. Both show scalar versus
+  map verdict, process-specific components, reason codes, cell data, and model
+  provenance without changing the scalar execution verdict.
 - Agent Run Inspector shows recent `agent_run_id` records, model/provider,
   status, question, final answer, tool calls, requested think mode, prompt
   version, and step timeline from `/api/v2/agent-runs`. In the MES API process,

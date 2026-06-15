@@ -5,6 +5,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from src.environment.process_quality.process_b import (
+    generate_process_b_quality_evidence,
+)
 from src.objects import ProcessB_Machine, Task
 
 # Physical model constants (simplified model used by this environment).
@@ -179,11 +182,22 @@ class ProcessB_Env:
             task_uids = [task.uid for task in finished_batch]
             quality_values: List[float] = []
             target_specs: List[Dict[str, Any]] = []
+            quality_evidence: List[Dict[str, Any]] = []
             pass_count = 0
             fail_count = 0
 
             for task in finished_batch:
                 qa_result = self._run_qa_check(machine, recipe_used, task)
+                evidence = generate_process_b_quality_evidence(
+                    scalar_qa=float(qa_result["realized_qa"]),
+                    spec=task.spec_b,
+                    recipe=recipe_used,
+                    v=getattr(machine, "v", 0),
+                    b_age=getattr(machine, "b_age", 0),
+                    task_uid=task.uid,
+                    equipment_id=machine.id,
+                    completion_time=current_time,
+                )
 
                 if qa_result["passed"]:
                     succeeded_tasks.append(task)
@@ -215,8 +229,11 @@ class ProcessB_Env:
                         "passed": qa_result["passed"],
                         "recipe": recipe_used,
                         "rework_count": task.rework_count,
+                        "quality_evidence_summary": dict(evidence["summary"]),
+                        "quality_evidence_model": dict(evidence["model"]),
                     }
                 )
+                quality_evidence.append(evidence)
                 quality_values.append(float(qa_result["realized_qa"]))
                 target_specs.append(
                     {
@@ -248,6 +265,7 @@ class ProcessB_Env:
                     "v": getattr(machine, "v", 0),
                     "b_age": getattr(machine, "b_age", 0),
                     "target_specs": target_specs,
+                    "quality_evidence": quality_evidence,
                 }
             )
 

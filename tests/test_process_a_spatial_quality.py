@@ -4,6 +4,9 @@ from src.environment.process_a_env import ProcessA_Env
 from src.environment.process_a_spatial_quality import (
     generate_process_a_spatial_quality,
 )
+from src.environment.process_quality.process_a import (
+    generate_process_a_quality_evidence,
+)
 from src.objects import Task
 
 
@@ -94,6 +97,39 @@ def test_spatial_map_rejects_invalid_spec_recipe_and_grid_size() -> None:
         _generate(grid_size=8)
 
 
+def test_process_a_provider_wraps_existing_map_in_common_evidence_contract() -> None:
+    evidence = generate_process_a_quality_evidence(
+        scalar_qa=49.2,
+        spec=(45.0, 55.0),
+        recipe=[10.0, 2.0, 1.0],
+        u=8.0,
+        m_age=80.0,
+        task_uid=184,
+        equipment_id="A_0",
+        completion_time=20,
+    )
+    legacy = _generate()
+
+    assert evidence["operation_id"] == "A"
+    assert evidence["quality_kind"] == "PROCESS_A_SPATIAL_QUALITY"
+    assert evidence["evidence_type"] == "SIMULATED_SPATIAL_QUALITY"
+    assert evidence["scalar_verdict"] == "PASS"
+    assert evidence["map_verdict"] == (
+        "PASS" if legacy["summary"]["map_passed"] else "RISK"
+    )
+    for field in (
+        "geometry",
+        "spec",
+        "scalar_qa",
+        "cells",
+        "summary",
+        "components",
+        "reason_codes",
+        "model",
+    ):
+        assert evidence[field] == legacy[field]
+
+
 def test_process_a_completion_event_contains_spatial_map_without_changing_scalar_verdict() -> None:
     env = ProcessA_Env(
         {
@@ -124,6 +160,10 @@ def test_process_a_completion_event_contains_spatial_map_without_changing_scalar
     )
     assert len(completion["spatial_quality_maps"]) == 1
     spatial = completion["spatial_quality_maps"][0]
+    assert completion["quality_evidence"] == [spatial]
+    assert spatial["operation_id"] == "A"
+    assert spatial["quality_kind"] == "PROCESS_A_SPATIAL_QUALITY"
+    assert spatial["scalar_verdict"] == "PASS"
     assert spatial["task_uid"] == 7
     assert spatial["equipment_id"] == "A_0"
     assert spatial["summary"]["mean"] == pytest.approx(task.realized_qa_A, abs=1e-6)

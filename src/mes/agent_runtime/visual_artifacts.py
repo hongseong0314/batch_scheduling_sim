@@ -12,8 +12,15 @@ ARTIFACT_TYPES = {
     "equipment_timeseries",
     "equipment_anomalies",
     "process_a_spatial_quality",
+    "process_quality_evidence",
 }
-CHART_TYPES = {"line", "bar", "event_timeline", "spatial_quality_map"}
+CHART_TYPES = {
+    "line",
+    "bar",
+    "event_timeline",
+    "spatial_quality_map",
+    "process_quality_map",
+}
 VISUALIZATION_FIELDS = {
     "chart_type",
     "x_field",
@@ -162,6 +169,89 @@ def build_process_a_spatial_quality_artifact(
     return validate_visual_artifact(artifact)
 
 
+def build_process_quality_evidence_artifact(
+    payload: Mapping[str, Any],
+    *,
+    query_tool: str = "query_process_quality_evidence",
+) -> Dict[str, Any]:
+    quality_evidence = deepcopy(
+        dict(payload.get("quality_evidence") or {})
+    )
+    display_name = str(
+        payload.get("display_name")
+        or payload.get("equipment_id")
+        or "Process"
+    )
+    task_uid = payload.get("task_uid")
+    quality_kind = str(quality_evidence.get("quality_kind") or "")
+    quality_label = {
+        "PROCESS_A_SPATIAL_QUALITY": "Spatial Quality",
+        "PROCESS_B_CLEANING_QUALITY": "Cleaning Quality",
+    }.get(quality_kind, "Process Quality")
+    spec = dict(quality_evidence.get("spec") or {})
+    low = spec.get("low")
+    high = spec.get("high")
+    target_bands = (
+        [[float(low), float(high)]]
+        if low is not None and high is not None
+        else []
+    )
+    reason_codes = [
+        str(value) for value in quality_evidence.get("reason_codes", [])
+    ]
+    artifact = {
+        "artifact_type": "process_quality_evidence",
+        "title": f"{display_name} · Task {task_uid} · {quality_label}",
+        "quality_kind": quality_kind,
+        "operation_id": str(
+            payload.get("operation_id")
+            or quality_evidence.get("operation_id")
+            or ""
+        ),
+        "equipment_ids": [str(payload.get("equipment_id") or "")],
+        "metrics": ["quality_evidence"],
+        "window": {
+            "start": int(payload.get("completion_time", 0) or 0),
+            "end": int(payload.get("completion_time", 0) or 0),
+        },
+        "series": [],
+        "events": [
+            {
+                "event_id": f"QUALITY-{task_uid}-{index}",
+                "equipment_id": str(payload.get("equipment_id") or ""),
+                "display_name": display_name,
+                "time": int(payload.get("completion_time", 0) or 0),
+                "evidence_class": "DERIVED_PROCESS_QUALITY",
+                "code": code,
+                "severity": (
+                    "critical"
+                    if code
+                    in {
+                        "LOCAL_OOS_CLUSTER",
+                        "RESIDUAL_CONTAMINATION_CLUSTER",
+                    }
+                    else "warning"
+                ),
+                "message": _quality_reason_message(code),
+            }
+            for index, code in enumerate(reason_codes)
+        ],
+        "summary": deepcopy(dict(quality_evidence.get("summary") or {})),
+        "quality_evidence": quality_evidence,
+        "visualization": {
+            "chart_type": "process_quality_map",
+            "grid_field": "quality_evidence.cells",
+            "value_field": "value",
+            "verdict_field": "verdict",
+            "coordinate_fields": ["x", "y"],
+            "target_bands": target_bands,
+        },
+        "provenance": _provenance(payload, query_tool),
+    }
+    artifact["artifact_id"] = _artifact_id(artifact)
+    return validate_visual_artifact(artifact)
+
+
 def validate_visual_artifact(artifact: Mapping[str, Any]) -> Dict[str, Any]:
     payload = deepcopy(dict(artifact))
     artifact_type = str(payload.get("artifact_type", ""))
@@ -193,9 +283,11 @@ def _provenance(payload: Mapping[str, Any], query_tool: str) -> Dict[str, Any]:
     evidence_type = payload.get("evidence_type")
     if evidence_type:
         provenance["evidence_type"] = str(evidence_type)
-    spatial_quality = payload.get("spatial_quality")
-    if isinstance(spatial_quality, Mapping):
-        model = spatial_quality.get("model")
+    quality_payload = payload.get("quality_evidence")
+    if not isinstance(quality_payload, Mapping):
+        quality_payload = payload.get("spatial_quality")
+    if isinstance(quality_payload, Mapping):
+        model = quality_payload.get("model")
         if isinstance(model, Mapping):
             provenance["model_id"] = str(model.get("model_id") or "")
             provenance["model_version"] = str(model.get("version") or "")
@@ -211,6 +303,36 @@ def _spatial_reason_message(code: str) -> str:
         "CONSUMABLE_HOTSPOT": "Consumable usage contributes a localized quality hotspot.",
     }
     return messages.get(code, "Derived spatial quality condition.")
+
+
+def _quality_reason_message(code: str) -> str:
+    messages = {
+        "LOCAL_OOS_CLUSTER": (
+            "One or more connected spatial cells are outside specification."
+        ),
+        "EDGE_NON_UNIFORMITY": (
+            "Edge and center quality means differ beyond the model threshold."
+        ),
+        "DIRECTIONAL_BIAS": (
+            "Recipe-dependent directional variation is present."
+        ),
+        "CONSUMABLE_HOTSPOT": (
+            "Consumable usage contributes a localized quality hotspot."
+        ),
+        "RESIDUAL_CONTAMINATION_CLUSTER": (
+            "Connected cells indicate localized residual contamination risk."
+        ),
+        "EDGE_CLEANING_NON_UNIFORMITY": (
+            "Edge cleaning performance differs from the center region."
+        ),
+        "FLOW_DIRECTION_BIAS": (
+            "The cleaning field contains recipe-dependent flow-direction bias."
+        ),
+        "SOLUTION_DEGRADATION_HOTSPOT": (
+            "Solution usage contributes a localized cleaning-quality hotspot."
+        ),
+    }
+    return messages.get(code, "Derived process quality condition.")
 
 
 def _timeseries_title(

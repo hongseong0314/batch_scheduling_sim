@@ -358,6 +358,14 @@ def _compact_tool_result_for_llm(result: Mapping[str, Any]) -> Dict[str, Any]:
         cells = compact_spatial.pop("cells", [])
         compact_spatial["cell_count"] = len(cells) if isinstance(cells, list) else 0
         payload["spatial_quality"] = compact_spatial
+    quality_evidence = payload.get("quality_evidence")
+    if isinstance(quality_evidence, Mapping):
+        compact_evidence = dict(quality_evidence)
+        cells = compact_evidence.pop("cells", [])
+        compact_evidence["cell_count"] = (
+            len(cells) if isinstance(cells, list) else 0
+        )
+        payload["quality_evidence"] = compact_evidence
     return payload
 
 

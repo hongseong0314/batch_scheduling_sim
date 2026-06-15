@@ -3,9 +3,13 @@ import pytest
 from src.environment.process_a_spatial_quality import (
     generate_process_a_spatial_quality,
 )
+from src.environment.process_quality.process_b import (
+    generate_process_b_quality_evidence,
+)
 from src.mes.runtime.context import MESAPIContext
 from src.mes.runtime.process_quality_maps import (
     query_process_a_spatial_quality,
+    query_process_quality_evidence,
 )
 
 
@@ -52,6 +56,106 @@ def _context_with_maps() -> MESAPIContext:
         },
     ]
     return context
+
+
+def _context_with_common_evidence() -> MESAPIContext:
+    context = _context_with_maps()
+    context.env.env_B.event_log = [
+        {
+            "timestamp": 22,
+            "event_type": "task_completed",
+            "process": "B",
+            "machine_id": "B_0",
+            "quality_evidence": [
+                generate_process_b_quality_evidence(
+                    scalar_qa=52.4,
+                    spec=(40.0, 70.0),
+                    recipe=[50.0, 50.0, 30.0],
+                    v=8,
+                    b_age=80,
+                    task_uid=22,
+                    equipment_id="B_0",
+                    completion_time=22,
+                )
+            ],
+        }
+    ]
+    return context
+
+
+def test_query_process_quality_evidence_returns_latest_a_or_b_evidence() -> None:
+    context = _context_with_common_evidence()
+
+    process_a = query_process_quality_evidence(
+        context,
+        equipment_id="LITHO-01",
+    )
+    process_b = query_process_quality_evidence(
+        context,
+        operation_id="B",
+        equipment_id="CLEAN-01",
+    )
+
+    assert process_a["found"] is True
+    assert process_a["operation_id"] == "A"
+    assert process_a["quality_evidence"]["quality_kind"] == (
+        "PROCESS_A_SPATIAL_QUALITY"
+    )
+    assert process_b["found"] is True
+    assert process_b["operation_id"] == "B"
+    assert process_b["equipment_id"] == "B_0"
+    assert process_b["display_name"] == "CLEAN-01"
+    assert process_b["task_uid"] == 22
+    assert process_b["quality_evidence"]["quality_kind"] == (
+        "PROCESS_B_CLEANING_QUALITY"
+    )
+
+
+def test_query_process_quality_evidence_searches_by_task_and_validates_operation() -> None:
+    context = _context_with_common_evidence()
+
+    by_task = query_process_quality_evidence(context, task_uid=22)
+    assert by_task["operation_id"] == "B"
+
+    with pytest.raises(
+        ValueError,
+        match="QUALITY_EVIDENCE_OPERATION_MISMATCH:A:B",
+    ):
+        query_process_quality_evidence(
+            context,
+            operation_id="A",
+            equipment_id="B_0",
+        )
+    with pytest.raises(
+        ValueError,
+        match="UNSUPPORTED_QUALITY_EVIDENCE_OPERATION:C",
+    ):
+        query_process_quality_evidence(
+            context,
+            operation_id="C",
+            task_uid=22,
+        )
+
+
+def test_query_process_quality_evidence_handles_missing_lookup_and_evidence() -> None:
+    context = MESAPIContext()
+    context.env.env_A.event_log = []
+    context.env.env_B.event_log = []
+
+    with pytest.raises(ValueError, match="MISSING_QUALITY_EVIDENCE_LOOKUP"):
+        query_process_quality_evidence(context)
+
+    assert query_process_quality_evidence(
+        context,
+        operation_id="B",
+        task_uid=999,
+    ) == {
+        "found": False,
+        "reason": "NO_MATCHING_QUALITY_EVIDENCE",
+        "operation_id": "B",
+        "equipment_id": None,
+        "task_uid": 999,
+    }
 
 
 def test_query_process_a_spatial_quality_returns_latest_map_by_display_name() -> None:

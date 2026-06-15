@@ -3,11 +3,15 @@ import pytest
 from src.mes.agent_runtime.visual_artifacts import (
     build_anomaly_artifact,
     build_process_a_spatial_quality_artifact,
+    build_process_quality_evidence_artifact,
     build_timeseries_artifact,
     validate_visual_artifact,
 )
 from src.environment.process_a_spatial_quality import (
     generate_process_a_spatial_quality,
+)
+from src.environment.process_quality.process_b import (
+    generate_process_b_quality_evidence,
 )
 
 
@@ -197,4 +201,49 @@ def test_process_a_spatial_artifact_preserves_map_and_simulator_provenance() -> 
     assert artifact["spatial_quality"]["summary"]["mean"] == pytest.approx(49.2)
     assert artifact["provenance"]["evidence_type"] == "SIMULATED_SPATIAL_QUALITY"
     assert artifact["provenance"]["model_id"] == "PROCESS_A_SPATIAL_FIELD"
+    assert artifact["provenance"]["model_version"] == "1.0.0"
+
+
+def test_process_quality_artifact_preserves_b_cleaning_evidence_and_provenance() -> None:
+    evidence = generate_process_b_quality_evidence(
+        scalar_qa=52.4,
+        spec=(40.0, 70.0),
+        recipe=[50.0, 50.0, 30.0],
+        v=8,
+        b_age=80,
+        task_uid=22,
+        equipment_id="B_0",
+        completion_time=22,
+    )
+    artifact = build_process_quality_evidence_artifact(
+        {
+            "found": True,
+            "source": "SIMULATOR",
+            "time_basis": "SIMULATION_STEP",
+            "operation_id": "B",
+            "evidence_type": "SIMULATED_CLEANING_QUALITY",
+            "equipment_id": "B_0",
+            "display_name": "CLEAN-01",
+            "task_uid": 22,
+            "completion_time": 22,
+            "quality_evidence": evidence,
+        }
+    )
+
+    assert artifact["artifact_type"] == "process_quality_evidence"
+    assert artifact["title"] == "CLEAN-01 · Task 22 · Cleaning Quality"
+    assert artifact["quality_kind"] == "PROCESS_B_CLEANING_QUALITY"
+    assert artifact["quality_evidence"] == evidence
+    assert artifact["visualization"] == {
+        "chart_type": "process_quality_map",
+        "grid_field": "quality_evidence.cells",
+        "value_field": "value",
+        "verdict_field": "verdict",
+        "coordinate_fields": ["x", "y"],
+        "target_bands": [[40.0, 70.0]],
+    }
+    assert artifact["provenance"]["evidence_type"] == (
+        "SIMULATED_CLEANING_QUALITY"
+    )
+    assert artifact["provenance"]["model_id"] == "PROCESS_B_CLEANING_FIELD"
     assert artifact["provenance"]["model_version"] == "1.0.0"

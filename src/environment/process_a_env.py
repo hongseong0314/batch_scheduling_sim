@@ -3,8 +3,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from src.environment.process_a_spatial_quality import (
-    generate_process_a_spatial_quality,
+from src.environment.process_quality.process_a import (
+    generate_process_a_quality_evidence,
 )
 from src.objects import ProcessA_Machine, Task
 
@@ -165,6 +165,7 @@ class ProcessA_Env:
             quality_values: List[float] = []
             target_specs: List[Dict[str, Any]] = []
             spatial_quality_maps: List[Dict[str, Any]] = []
+            quality_evidence: List[Dict[str, Any]] = []
             pass_count = 0
             fail_count = 0
 
@@ -184,7 +185,7 @@ class ProcessA_Env:
                         "u": getattr(machine, "u", 0),
                         "m_age": getattr(machine, "m_age", 0),
                     },
-                    **generate_process_a_spatial_quality(
+                    **generate_process_a_quality_evidence(
                         scalar_qa=float(task.realized_qa_A),
                         spec=task.spec_a,
                         recipe=recipe_used,
@@ -202,6 +203,7 @@ class ProcessA_Env:
                     spatial_quality["model"]
                 )
                 spatial_quality_maps.append(spatial_quality)
+                quality_evidence.append(spatial_quality)
 
                 if passed:
                     succeeded_tasks.append(task)
@@ -248,6 +250,7 @@ class ProcessA_Env:
                     "m_age": getattr(machine, "m_age", 0),
                     "target_specs": target_specs,
                     "spatial_quality_maps": spatial_quality_maps,
+                    "quality_evidence": quality_evidence,
                 }
             )
 

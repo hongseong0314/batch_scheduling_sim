@@ -510,7 +510,8 @@ Recommended next build order:
 3. Auth, roles, and production outbox submission for write-capable workflows.
 4. Full source-data quality dashboard for duplicate, late, missing, and
    conflicting events.
-5. Connect Agent Visual Analytics to canonical FDC/event-time telemetry,
+5. Connect the provider-driven A/B Process Quality Intelligence and generic
+   Agent Visual Analytics contracts to canonical FDC/event-time telemetry,
    preserving source/time provenance and simulator compatibility.
 6. Add approval-gated write-tool contract for future L4/operator workflows,
    keeping current `/mes#chat` default read-only.

@@ -1,7 +1,7 @@
 # MES Agent Visual Analytics V1
 
 Status: implemented V1
-Last updated: 2026-06-12
+Last updated: 2026-06-15
 
 ## Purpose
 
@@ -74,6 +74,7 @@ query_equipment_anomalies
 Process-specific quality visualization extends this catalog with:
 
 ```text
+query_process_quality_evidence
 query_process_a_spatial_quality
 ```
 
@@ -157,6 +158,8 @@ inject script, HTML, CSS, SQL, or arbitrary Vega expressions.
 | Module | Responsibility |
 |---|---|
 | `src/mes/runtime/equipment_telemetry.py` | Generic A/B/C equipment resolution, metric catalog, time series, alarm/anomaly evidence |
+| `src/mes/runtime/process_quality_maps.py` | Common A/B quality evidence query and A compatibility projection |
+| `src/environment/process_quality/` | Common evidence contract, provider registry, A/B process-specific models |
 | `src/mes/agent_runtime/visual_tools.py` | Read-only Agent Mode tool schemas and execution |
 | `src/mes/agent_runtime/visual_artifacts.py` | Deterministic typed artifacts and data-only validation |
 | `src/mes/agent_runtime/agent_loop.py` | Artifact collection across multi-step tool calls |
@@ -168,14 +171,18 @@ The inspector does not execute chart code from the model. It maps the approved
 artifact fields to built-in SVG renderers for line, bar, and event-timeline
 views.
 
-## Process A Spatial Quality Extension
+## Process Quality Evidence Extension
 
-Process A can return:
+A and B return the same transport contract with different process semantics:
 
 ```json
 {
-  "artifact_type": "process_a_spatial_quality",
-  "spatial_quality": {
+  "artifact_type": "process_quality_evidence",
+  "quality_kind": "PROCESS_B_CLEANING_QUALITY",
+  "quality_evidence": {
+    "operation_id": "B",
+    "scalar_verdict": "PASS",
+    "map_verdict": "RISK",
     "geometry": {
       "shape": "CIRCLE",
       "grid_size": 17,
@@ -183,16 +190,15 @@ Process A can return:
     },
     "cells": [],
     "summary": {
-      "mean": 49.2,
-      "std": 1.84,
-      "oos_ratio": 0.073,
+      "mean": 52.4,
+      "oos_ratio": 0.03,
       "scalar_passed": true,
       "map_passed": false
     }
   },
   "visualization": {
-    "chart_type": "spatial_quality_map",
-    "grid_field": "spatial_quality.cells",
+    "chart_type": "process_quality_map",
+    "grid_field": "quality_evidence.cells",
     "value_field": "value",
     "verdict_field": "verdict",
     "coordinate_fields": ["x", "y"]
@@ -200,15 +206,17 @@ Process A can return:
   "provenance": {
     "source": "SIMULATOR",
     "time_basis": "SIMULATION_STEP",
-    "evidence_type": "SIMULATED_SPATIAL_QUALITY",
-    "model_id": "PROCESS_A_SPATIAL_FIELD",
+    "evidence_type": "SIMULATED_CLEANING_QUALITY",
+    "model_id": "PROCESS_B_CLEANING_FIELD",
     "model_version": "1.0.0"
   }
 }
 ```
 
-The existing scalar QA is preserved as the map mean. The map is a simulated
-process-specific quality explanation, not observed spatial metrology.
+The provider registry currently maps A to spatial pattern quality and B to
+residual-contamination/cleaning-uniformity quality. The existing scalar QA is
+preserved as the map mean and remains the execution verdict. The map is a
+simulated process-specific explanation, not observed spatial metrology.
 
 ## Runtime Boundaries
 

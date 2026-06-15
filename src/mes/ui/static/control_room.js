@@ -127,9 +127,12 @@
       }
     }
 
-    function renderChatThread() {
+    function renderChatThread({ forceScrollToBottom = false } = {}) {
       const thread = document.getElementById("chat-thread");
       if (!thread) return;
+      const previousScrollTop = thread.scrollTop;
+      const distanceFromBottom = thread.scrollHeight - thread.clientHeight - previousScrollTop;
+      const wasNearBottom = distanceFromBottom <= 32;
       thread.innerHTML = chatMessages.map(message => {
         const role = String(message.role || "assistant");
         const toolCalls = message.tool_calls || [];
@@ -172,7 +175,11 @@
       thread.querySelectorAll("[data-chat-artifact-id]").forEach(button => {
         button.onclick = () => activateChatArtifact(button.dataset.chatArtifactId);
       });
-      thread.scrollTop = thread.scrollHeight;
+      if (forceScrollToBottom || wasNearBottom) {
+        thread.scrollTop = thread.scrollHeight;
+      } else {
+        thread.scrollTop = previousScrollTop;
+      }
       const count = chatMessages.filter(message => message.role === "assistant").length;
       document.getElementById("nav-chat").textContent = count ? String(count) : "ready";
     }
@@ -181,7 +188,7 @@
       const trimmed = String(message || "").trim();
       if (!trimmed) return;
       chatMessages.push({ role: "user", content: trimmed, mode: "", tool_calls: [], visual_artifacts: [] });
-      renderChatThread();
+      renderChatThread({ forceScrollToBottom: true });
       const status = document.getElementById("chat-status");
       const sendButton = document.getElementById("chat-send");
       status.textContent = "running";
@@ -791,7 +798,6 @@
       renderChatModels(aiDev.processChatModels || {});
       renderEvents(live.recent_events || []);
       renderGantt(gantt || {}, live);
-      renderChatThread();
       updateNavState();
     }
 
@@ -2126,5 +2132,6 @@
         collapsed ? "Show full raw JSON" : "Collapse raw JSON";
     };
     window.addEventListener("hashchange", updateNavState);
+    renderChatThread();
     setInterval(() => refresh(running ? Number(document.getElementById("speed").value) : 0), 1000);
     refresh(0);

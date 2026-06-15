@@ -248,3 +248,18 @@ def test_control_room_chat_script_supports_visual_artifacts_and_inspector_action
     assert "PROCESS_B_CLEANING_QUALITY" in html
     assert "SIMULATED_CLEANING_QUALITY" in html
     assert "SIMULATED_SPATIAL_QUALITY" in html
+
+
+def test_control_room_chat_preserves_reader_scroll_during_live_refresh() -> None:
+    html = client.get("/mes").text
+
+    render_start = html.index("function render(live, gantt, aiDev = {})")
+    render_end = html.index("function renderStages(stages)", render_start)
+    live_render_body = html[render_start:render_end]
+
+    assert "renderChatThread();" not in live_render_body
+    assert "const previousScrollTop = thread.scrollTop;" in html
+    assert "const wasNearBottom =" in html
+    assert "forceScrollToBottom || wasNearBottom" in html
+    assert "thread.scrollTop = previousScrollTop;" in html
+    assert "renderChatThread({ forceScrollToBottom: true });" in html

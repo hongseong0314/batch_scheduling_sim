@@ -267,4 +267,3 @@ Verify desktop and mobile:
 - close and full-screen work,
 - no text overlap or horizontal page overflow,
 - existing non-visual Chat still uses the full workspace.
-

@@ -127,9 +127,12 @@
       }
     }
 
-    function renderChatThread() {
+    function renderChatThread({ forceScrollToBottom = false } = {}) {
       const thread = document.getElementById("chat-thread");
       if (!thread) return;
+      const previousScrollTop = thread.scrollTop;
+      const distanceFromBottom = thread.scrollHeight - thread.clientHeight - previousScrollTop;
+      const wasNearBottom = distanceFromBottom <= 32;
       thread.innerHTML = chatMessages.map(message => {
         const role = String(message.role || "assistant");
         const toolCalls = message.tool_calls || [];
@@ -172,7 +175,11 @@
       thread.querySelectorAll("[data-chat-artifact-id]").forEach(button => {
         button.onclick = () => activateChatArtifact(button.dataset.chatArtifactId);
       });
-      thread.scrollTop = thread.scrollHeight;
+      if (forceScrollToBottom || wasNearBottom) {
+        thread.scrollTop = thread.scrollHeight;
+      } else {
+        thread.scrollTop = previousScrollTop;
+      }
       const count = chatMessages.filter(message => message.role === "assistant").length;
       document.getElementById("nav-chat").textContent = count ? String(count) : "ready";
     }
@@ -181,7 +188,7 @@
       const trimmed = String(message || "").trim();
       if (!trimmed) return;
       chatMessages.push({ role: "user", content: trimmed, mode: "", tool_calls: [], visual_artifacts: [] });
-      renderChatThread();
+      renderChatThread({ forceScrollToBottom: true });
       const status = document.getElementById("chat-status");
       const sendButton = document.getElementById("chat-send");
       status.textContent = "running";
@@ -236,6 +243,10 @@
       if (result.predicted_qa !== undefined) {
         return `predicted_qa ${result.predicted_qa} · risk ${result.quality_risk || "-"}`;
       }
+      if (result.quality_evidence) {
+        const summary = result.quality_evidence.summary || {};
+        return `${result.display_name || result.equipment_id || result.operation_id || "Process"} · task ${result.task_uid ?? "-"} · mean ${formatArtifactValue("quality", summary.mean)} · OOS ${Math.round(Number(summary.oos_ratio || 0) * 1000) / 10}%`;
+      }
       if (result.evidence_type === "SIMULATED_SPATIAL_QUALITY") {
         const summary = result.spatial_quality?.summary || {};
         return `${result.display_name || result.equipment_id || "Process A"} · task ${result.task_uid ?? "-"} · mean ${formatArtifactValue("quality", summary.mean)} · OOS ${Math.round(Number(summary.oos_ratio || 0) * 1000) / 10}%`;
@@ -268,12 +279,14 @@
         "equipment_timeseries",
         "equipment_anomalies",
         "process_a_spatial_quality",
+        "process_quality_evidence",
       ]);
       const supportedCharts = new Set([
         "line",
         "bar",
         "event_timeline",
         "spatial_quality_map",
+        "process_quality_map",
       ]);
       (artifacts || []).forEach(artifact => {
         if (!artifact || !artifact.artifact_id || !supportedTypes.has(artifact.artifact_type)) return;
@@ -374,7 +387,7 @@
     function renderArtifactKpis(artifact) {
       const events = artifactEvents(artifact);
       const summary = artifact.summary || {};
-      if (artifact.artifact_type === "process_a_spatial_quality") {
+      if (["process_a_spatial_quality", "process_quality_evidence"].includes(artifact.artifact_type)) {
         const items = [
           ["Map mean", formatArtifactValue("quality", summary.mean)],
           ["Uniformity σ", formatArtifactValue("quality", summary.std)],
@@ -418,6 +431,10 @@
     function renderChatInspectorChart(artifact) {
       const target = document.getElementById("chat-inspector-chart");
       const chartType = artifact.visualization?.chart_type;
+      if (chartType === "process_quality_map") {
+        target.innerHTML = renderProcessQualityMap(artifact);
+        return;
+      }
       if (chartType === "spatial_quality_map") {
         target.innerHTML = renderSpatialQualityMap(artifact);
         return;
@@ -441,15 +458,16 @@
       ).join("")}</div>`;
     }
 
-    function renderSpatialQualityMap(artifact) {
-      const spatial = artifact.spatial_quality || {};
-      const geometry = spatial.geometry || {};
-      const summary = spatial.summary || {};
-      const components = spatial.components || {};
-      const cells = spatial.cells || [];
+    function renderProcessQualityMap(artifact) {
+      const evidence = artifact.quality_evidence || artifact.spatial_quality || {};
+      const presentation = processQualityPresentation(evidence.quality_kind);
+      const geometry = evidence.geometry || {};
+      const summary = evidence.summary || {};
+      const components = evidence.components || {};
+      const cells = evidence.cells || [];
       const gridSize = Math.max(1, Number(geometry.grid_size || 17));
       if (!cells.length) {
-        return "<div class='empty-state'>No spatial quality cells were returned.</div>";
+        return "<div class='empty-state'>No process quality cells were returned.</div>";
       }
       const verdictClass = verdict => {
         const normalized = String(verdict || "").toLowerCase();
@@ -474,9 +492,9 @@
           aria-label="${escapeText(label)}"
         ></div>`;
       }).join("");
-      const scalarVerdict = summary.scalar_passed ? "PASS" : "FAIL";
-      const mapVerdict = summary.map_passed ? "PASS" : "RISK";
-      const reasonCodes = spatial.reason_codes || [];
+      const scalarVerdict = evidence.scalar_verdict || (summary.scalar_passed ? "PASS" : "FAIL");
+      const mapVerdict = evidence.map_verdict || (summary.map_passed ? "PASS" : "RISK");
+      const reasonCodes = evidence.reason_codes || [];
       return `<div class="spatial-quality-layout">
         <section class="spatial-quality-map-panel">
           <div class="spatial-quality-verdict">
@@ -488,7 +506,7 @@
               class="spatial-quality-grid"
               style="grid-template-columns:repeat(${gridSize},1fr);grid-template-rows:repeat(${gridSize},1fr)"
               role="img"
-              aria-label="Process A simulated spatial quality verdict map"
+              aria-label="${escapeText(presentation.ariaLabel)}"
             >${cellHtml}</div>
           </div>
           <div class="chat-inspector-legend spatial-quality-legend">
@@ -500,33 +518,69 @@
         </section>
         <aside class="spatial-quality-explanation">
           <div>
-            <span class="section-kicker">SIMULATED_SPATIAL_QUALITY</span>
-            <h3>Position-level assessment</h3>
-            <p>Scalar QA remains the Process A execution verdict. The map exposes simulated local risk that the scalar average cannot show.</p>
+            <span class="section-kicker">${escapeText(evidence.evidence_type || presentation.evidenceType)}</span>
+            <h3>${escapeText(presentation.heading)}</h3>
+            <p>${escapeText(presentation.description)}</p>
           </div>
           <dl class="spatial-quality-components">
-            <div><dt>Radial</dt><dd>${escapeText(formatArtifactValue("quality", components.radial_amplitude))}</dd></div>
-            <div><dt>Directional</dt><dd>${escapeText(formatArtifactValue("quality", components.directional_amplitude))}</dd></div>
-            <div><dt>Hotspot</dt><dd>${escapeText(formatArtifactValue("quality", components.hotspot_amplitude))}</dd></div>
-            <div><dt>Local noise</dt><dd>${escapeText(formatArtifactValue("quality", components.noise_amplitude))}</dd></div>
+            ${presentation.components.map(([label, field]) => `<div><dt>${escapeText(label)}</dt><dd>${escapeText(formatArtifactValue("quality", components[field]))}</dd></div>`).join("")}
           </dl>
           <div class="spatial-quality-reasons">
             ${reasonCodes.length
-              ? reasonCodes.map(code => `<div><strong>${escapeText(code)}</strong><span>${escapeText(spatialReasonText(code))}</span></div>`).join("")
-              : "<div><strong>NO_LOCAL_RISK</strong><span>No derived spatial risk crossed the model thresholds.</span></div>"}
+              ? reasonCodes.map(code => `<div><strong>${escapeText(code)}</strong><span>${escapeText(processQualityReasonText(code))}</span></div>`).join("")
+              : `<div><strong>NO_LOCAL_RISK</strong><span>${escapeText(presentation.noRiskText)}</span></div>`}
           </div>
         </aside>
       </div>`;
     }
 
-    function spatialReasonText(code) {
+    function renderSpatialQualityMap(artifact) {
+      return renderProcessQualityMap(artifact);
+    }
+
+    function processQualityPresentation(qualityKind) {
+      if (qualityKind === "PROCESS_B_CLEANING_QUALITY") {
+        return {
+          evidenceType: "SIMULATED_CLEANING_QUALITY",
+          heading: "Residual contamination & uniformity",
+          description: "Scalar QA remains the Process B execution verdict. The map exposes simulated edge residue, flow bias, and solution-related local risk.",
+          ariaLabel: "Process B simulated residual contamination and cleaning uniformity map",
+          noRiskText: "No derived cleaning-quality risk crossed the model thresholds.",
+          components: [
+            ["Edge residue", "edge_residue_amplitude"],
+            ["Flow bias", "flow_direction_bias_amplitude"],
+            ["Solution hotspot", "solution_hotspot_amplitude"],
+            ["Local noise", "local_noise_amplitude"],
+          ],
+        };
+      }
+      return {
+        evidenceType: "SIMULATED_SPATIAL_QUALITY",
+        heading: "Position-level assessment",
+        description: "Scalar QA remains the Process A execution verdict. The map exposes simulated local risk that the scalar average cannot show.",
+        ariaLabel: "Process A simulated spatial quality verdict map",
+        noRiskText: "No derived spatial risk crossed the model thresholds.",
+        components: [
+          ["Radial", "radial_amplitude"],
+          ["Directional", "directional_amplitude"],
+          ["Hotspot", "hotspot_amplitude"],
+          ["Local noise", "noise_amplitude"],
+        ],
+      };
+    }
+
+    function processQualityReasonText(code) {
       const messages = {
         LOCAL_OOS_CLUSTER: "Connected positions are outside the task specification.",
         EDGE_NON_UNIFORMITY: "Edge and center means differ beyond the model threshold.",
         DIRECTIONAL_BIAS: "The recipe contributes a directional quality gradient.",
         CONSUMABLE_HOTSPOT: "Consumable usage contributes a localized low-quality region.",
+        RESIDUAL_CONTAMINATION_CLUSTER: "Connected positions indicate localized residual contamination risk.",
+        EDGE_CLEANING_NON_UNIFORMITY: "Edge cleaning performance differs from the center region.",
+        FLOW_DIRECTION_BIAS: "The cleaning field contains recipe-dependent flow-direction bias.",
+        SOLUTION_DEGRADATION_HOTSPOT: "Solution usage contributes a localized cleaning-quality hotspot.",
       };
-      return messages[code] || "Derived spatial quality condition.";
+      return messages[code] || "Derived process quality condition.";
     }
 
     function renderMetricChart(artifact, metric, chartType) {
@@ -650,7 +704,7 @@
 
     function renderChatInspectorData(artifact) {
       const target = document.getElementById("chat-inspector-data");
-      if (artifact.artifact_type === "process_a_spatial_quality") {
+      if (["process_a_spatial_quality", "process_quality_evidence"].includes(artifact.artifact_type)) {
         renderSpatialQualityData(target, artifact);
         return;
       }
@@ -673,9 +727,9 @@
     }
 
     function renderSpatialQualityData(target, artifact) {
-      const cells = artifact.spatial_quality?.cells || [];
+      const cells = artifact.quality_evidence?.cells || artifact.spatial_quality?.cells || [];
       if (!cells.length) {
-        target.innerHTML = "<div class='empty-state'>No spatial quality cells were returned.</div>";
+        target.innerHTML = "<div class='empty-state'>No process quality cells were returned.</div>";
         return;
       }
       target.innerHTML = `<div class="table-wrap"><table class="chat-inspector-table">
@@ -744,7 +798,6 @@
       renderChatModels(aiDev.processChatModels || {});
       renderEvents(live.recent_events || []);
       renderGantt(gantt || {}, live);
-      renderChatThread();
       updateNavState();
     }
 
@@ -2079,5 +2132,6 @@
         collapsed ? "Show full raw JSON" : "Collapse raw JSON";
     };
     window.addEventListener("hashchange", updateNavState);
+    renderChatThread();
     setInterval(() => refresh(running ? Number(document.getElementById("speed").value) : 0), 1000);
     refresh(0);

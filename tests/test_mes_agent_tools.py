@@ -1,4 +1,5 @@
 from src.environment.process_a_env import ProcessA_Env
+from src.environment.process_b_env import ProcessB_Env
 from src.mes.agent_runtime.mes_tools import MESAgentToolService
 from src.mes.runtime.context import MESAPIContext
 from src.objects import Task
@@ -19,6 +20,7 @@ def test_mes_agent_tool_catalog_exposes_read_only_runtime_tools() -> None:
     assert "query_equipment_timeseries" in by_name
     assert "query_equipment_anomalies" in by_name
     assert "query_process_a_spatial_quality" in by_name
+    assert "query_process_quality_evidence" in by_name
     assert "generate_process_a_l1_candidates" in by_name
     assert "generate_process_b_l1_candidates" in by_name
     assert "generate_process_c_l1_candidates" in by_name
@@ -121,6 +123,48 @@ def test_mes_agent_spatial_quality_tool_returns_latest_a_map_artifact() -> None:
     assert artifact["artifact_type"] == "process_a_spatial_quality"
     assert artifact["visualization"]["chart_type"] == "spatial_quality_map"
     assert artifact["provenance"]["evidence_type"] == "SIMULATED_SPATIAL_QUALITY"
+
+
+def test_mes_agent_quality_evidence_tool_returns_latest_b_cleaning_artifact() -> None:
+    context = MESAPIContext()
+    context.env.env_B = ProcessB_Env(
+        {
+            "num_machines_B": 1,
+            "process_time_B": 1,
+            "batch_size_B": 1,
+            "deterministic_mode": True,
+        }
+    )
+    task = Task(
+        uid=9,
+        job_id="JOB",
+        due_date=20,
+        spec_a=(45.0, 55.0),
+        spec_b=(40.0, 70.0),
+    )
+    context.env.env_B.add_tasks([task])
+    context.env.env_B.step(
+        0,
+        {"B_0": {"task_uids": [9], "recipe": [50.0, 50.0, 30.0]}},
+    )
+    context.env.env_B.step(1)
+    service = MESAgentToolService(context)
+
+    payload = service.run_tool(
+        "query_process_quality_evidence",
+        {"operation_id": "B", "equipment_id": "CLEAN-01"},
+    )
+
+    assert payload["found"] is True
+    assert payload["operation_id"] == "B"
+    assert payload["task_uid"] == 9
+    artifact = payload["visual_artifacts"][0]
+    assert artifact["artifact_type"] == "process_quality_evidence"
+    assert artifact["quality_kind"] == "PROCESS_B_CLEANING_QUALITY"
+    assert artifact["visualization"]["chart_type"] == "process_quality_map"
+    assert artifact["provenance"]["evidence_type"] == (
+        "SIMULATED_CLEANING_QUALITY"
+    )
 
 
 def test_mes_agent_tool_service_returns_compact_fab_snapshot() -> None:

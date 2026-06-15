@@ -216,7 +216,7 @@ def test_control_room_mounts_chat_page_and_nav() -> None:
     assert "/api/v2/process-chat/models" in html
     assert "/api/v2/process-chat" in html
     assert "/api/v2/agent-runs" in html
-    assert html.count('class="button compact chat-example"') == 7
+    assert html.count('class="button compact chat-example"') == 8
     assert (
         'data-message="A 공정에서 spec_a 48~53이고 u=6, m_age=12, '
         'recipe=[10,2,1]이면 QA가 어떻게 나올까?">A recipe QA</button>'
@@ -224,6 +224,10 @@ def test_control_room_mounts_chat_page_and_nav() -> None:
     assert (
         'data-message="현재 fab 상태와 active policy stack을 분석해서 공정별 WIP, '
         '가동 상태, 병목과 근거를 설명해줘">Fab analysis</button>'
+    ) in html
+    assert (
+        'data-message="CLEAN-01에서 가장 최근 세정된 제품의 잔류 오염과 '
+        '세정 균일도 맵을 보여줘">B cleaning map</button>'
     ) in html
 
 
@@ -236,6 +240,26 @@ def test_control_room_chat_script_supports_visual_artifacts_and_inspector_action
     assert "chat-inspector-open" in html
     assert "chat-inspector-fullscreen" in html
     assert "process_a_spatial_quality" in html
+    assert "process_quality_evidence" in html
     assert "spatial_quality_map" in html
+    assert "process_quality_map" in html
     assert "renderSpatialQualityMap" in html
+    assert "renderProcessQualityMap" in html
+    assert "PROCESS_B_CLEANING_QUALITY" in html
+    assert "SIMULATED_CLEANING_QUALITY" in html
     assert "SIMULATED_SPATIAL_QUALITY" in html
+
+
+def test_control_room_chat_preserves_reader_scroll_during_live_refresh() -> None:
+    html = client.get("/mes").text
+
+    render_start = html.index("function render(live, gantt, aiDev = {})")
+    render_end = html.index("function renderStages(stages)", render_start)
+    live_render_body = html[render_start:render_end]
+
+    assert "renderChatThread();" not in live_render_body
+    assert "const previousScrollTop = thread.scrollTop;" in html
+    assert "const wasNearBottom =" in html
+    assert "forceScrollToBottom || wasNearBottom" in html
+    assert "thread.scrollTop = previousScrollTop;" in html
+    assert "renderChatThread({ forceScrollToBottom: true });" in html

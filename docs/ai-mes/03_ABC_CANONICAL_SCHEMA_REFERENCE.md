@@ -1,7 +1,7 @@
 # A/B/C Canonical Schema Reference V1
 
 Status: implemented reference contract
-Last updated: 2026-05-31
+Last updated: 2026-06-15
 
 ## Reader
 
@@ -205,6 +205,73 @@ C-specific equipment state:
 {"current_batch_uids": [], "finish_time": -1}
 ```
 
+## Quality Evidence Contract
+
+Process quality is not forced into one universal physical model. Each operation
+keeps its own process semantics, while the AI MES transports the result through
+one common evidence envelope:
+
+```mermaid
+flowchart LR
+  Scalar["authoritative scalar QA"] --> Provider["operation quality provider"]
+  Features["recipe + equipment state + task spec"] --> Provider
+  Provider --> Evidence["QualityEvidence envelope"]
+  Evidence --> Event["completion event"]
+  Event --> Tool["read-only Agent tool"]
+  Tool --> Inspector["Active Inspector"]
+```
+
+The scalar QA and its existing pass/rework rule remain authoritative. The map
+is deterministic simulated evidence for local-risk explanation and policy
+evaluation; it is not observed FDC, metrology, vision, or wafer-bin data.
+
+Common envelope:
+
+```json
+{
+  "operation_id": "B",
+  "quality_kind": "PROCESS_B_CLEANING_QUALITY",
+  "evidence_type": "SIMULATED_CLEANING_QUALITY",
+  "equipment_id": "B_0",
+  "task_uid": 284,
+  "completion_time": 24,
+  "scalar_qa": 52.4,
+  "scalar_verdict": "PASS",
+  "map_verdict": "RISK",
+  "geometry": {
+    "shape": "CIRCLE",
+    "grid_size": 17,
+    "coordinate_system": "NORMALIZED_CARTESIAN"
+  },
+  "spec": {"low": 40.0, "high": 70.0},
+  "cells": [],
+  "summary": {
+    "mean": 52.4,
+    "oos_ratio": 0.03,
+    "scalar_passed": true,
+    "map_passed": false
+  },
+  "components": {},
+  "reason_codes": [],
+  "model": {
+    "model_id": "PROCESS_B_CLEANING_FIELD",
+    "version": "1.0.0"
+  }
+}
+```
+
+Current providers:
+
+| Operation | Quality kind | Process-specific components | Scalar boundary |
+|---|---|---|---|
+| A | `PROCESS_A_SPATIAL_QUALITY` | radial, directional, consumable hotspot, local noise | inclusive `low <= qa <= high` |
+| B | `PROCESS_B_CLEANING_QUALITY` | edge residue, flow-direction bias, solution hotspot, local noise | strict `low < qa < high` |
+
+Provider resolution is operation-driven through
+`src/environment/process_quality/registry.py`. New operations must implement a
+provider that returns this envelope; Agent and UI contracts do not need a new
+transport shape.
+
 ## Canonical Operation
 
 ```json
@@ -344,6 +411,16 @@ All six tools run against the current MES decision state, return `layer`,
 `operation_id`, `policy_id`, `decision_time`, diagnostics, and candidate or
 annotation rows. They do not apply recipes, dispatch equipment, or write
 records.
+
+Process quality evidence tool:
+
+```text
+query_process_quality_evidence
+```
+
+It accepts operation `A` or `B`, a canonical/display equipment name, a task UID,
+or a compatible combination. `query_process_a_spatial_quality` remains as the
+backward-compatible A-only projection.
 
 Example natural-language flow:
 

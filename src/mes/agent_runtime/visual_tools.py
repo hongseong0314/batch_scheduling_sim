@@ -7,6 +7,7 @@ from typing import Any, Dict, Mapping
 from src.mes.agent_runtime.visual_artifacts import (
     build_anomaly_artifact,
     build_process_a_spatial_quality_artifact,
+    build_process_quality_evidence_artifact,
     build_timeseries_artifact,
 )
 from src.mes.runtime.equipment_telemetry import (
@@ -16,6 +17,7 @@ from src.mes.runtime.equipment_telemetry import (
 )
 from src.mes.runtime.process_quality_maps import (
     query_process_a_spatial_quality,
+    query_process_quality_evidence,
 )
 
 
@@ -24,6 +26,7 @@ VISUAL_TOOL_IDS = (
     "query_equipment_timeseries",
     "query_equipment_anomalies",
     "query_process_a_spatial_quality",
+    "query_process_quality_evidence",
 )
 
 
@@ -125,6 +128,40 @@ def visual_tool_catalog() -> list[Dict[str, Any]]:
             ),
         },
         {
+            "id": "query_process_quality_evidence",
+            "name": "query_process_quality_evidence",
+            "read_only": True,
+            "description": (
+                "Return the latest or task-specific simulated process quality "
+                "evidence for Process A machining/pattern quality or Process B "
+                "residual-contamination and cleaning-uniformity analysis. "
+                "At least one of equipment_id or task_uid is required."
+            ),
+            "input_schema": _object_schema(
+                {
+                    "operation_id": {
+                        "type": "string",
+                        "enum": ["A", "B"],
+                        "description": (
+                            "Optional process operation filter. Use A for "
+                            "machining/pattern quality or B for cleaning quality."
+                        ),
+                    },
+                    "equipment_id": {
+                        "type": "string",
+                        "description": (
+                            "Canonical equipment id or display name, for example "
+                            "A_0, LITHO-01, B_0, or CLEAN-01."
+                        ),
+                    },
+                    "task_uid": {
+                        "type": "integer",
+                        "description": "Optional exact completed task uid.",
+                    },
+                },
+            ),
+        },
+        {
             "id": "query_process_a_spatial_quality",
             "name": "query_process_a_spatial_quality",
             "read_only": True,
@@ -201,6 +238,24 @@ def run_visual_tool(
             **payload,
             "visual_artifacts": [
                 build_process_a_spatial_quality_artifact(
+                    payload,
+                    query_tool=name,
+                )
+            ],
+        }
+    if name == "query_process_quality_evidence":
+        payload = query_process_quality_evidence(
+            context,
+            operation_id=_optional_string(arguments.get("operation_id")),
+            equipment_id=_optional_string(arguments.get("equipment_id")),
+            task_uid=arguments.get("task_uid"),
+        )
+        if not payload.get("found"):
+            return {**payload, "visual_artifacts": []}
+        return {
+            **payload,
+            "visual_artifacts": [
+                build_process_quality_evidence_artifact(
                     payload,
                     query_tool=name,
                 )

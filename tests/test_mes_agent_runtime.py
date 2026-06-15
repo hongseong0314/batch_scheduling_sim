@@ -369,6 +369,12 @@ class FakeVisualToolService:
                     {"row": 0, "column": 1, "value": 46.9, "verdict": "OOS_LOW"},
                 ],
             },
+            "quality_evidence": {
+                "summary": {"mean": 51.2, "oos_ratio": 0.01},
+                "cells": [
+                    {"row": 0, "column": 0, "value": 51.2, "verdict": "PASS"},
+                ],
+            },
             "visual_artifacts": [dict(self.artifact), dict(self.artifact)],
         }
 
@@ -390,3 +396,4 @@ def test_agent_runtime_collects_and_deduplicates_visual_artifacts() -> None:
     assert '"visual_artifacts"' not in tool_message["content"]
     assert '"cells"' not in tool_message["content"]
     assert '"cell_count": 2' in tool_message["content"]
+    assert '"cell_count": 1' in tool_message["content"]

@@ -8,6 +8,7 @@ UI_ROOT = Path(__file__).resolve().parent
 TEMPLATE_PATH = UI_ROOT / "templates" / "control_room.html"
 CSS_PATH = UI_ROOT / "static" / "control_room.css"
 JS_PATH = UI_ROOT / "static" / "control_room.js"
+STATIC_ROOT = UI_ROOT / "static"
 
 
 @lru_cache(maxsize=1)

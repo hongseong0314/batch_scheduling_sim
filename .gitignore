@@ -8,6 +8,13 @@ env/
 venv/
 .venv/
 
+# Node / browser tests
+node_modules/
+.vite/
+playwright-report/
+test-results/
+src/mes/ui/static/dist/
+
 # Conda
 .conda/
 
@@ -21,6 +28,8 @@ venv/
 data/
 *.csv
 *.json
+!frontend/factory-twin/package.json
+!frontend/factory-twin/package-lock.json
 *.parquet
 *.pkl
 *.pickle

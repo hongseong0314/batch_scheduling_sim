@@ -17,6 +17,7 @@
       <div class="nav-section" data-nav-section="operate">
         <div class="nav-label">Operate</div>
         <a class="nav-item active" href="#fab"><span>Fab Control</span><span id="nav-live">Live</span></a>
+        <a class="nav-item" href="#factory-twin"><span>Factory Twin</span><span id="nav-factory-twin">3D</span></a>
         <a class="nav-item" href="#gantt"><span>Flow & Gantt</span><span id="nav-gantt">-</span></a>
         <a class="nav-item" href="#equipment"><span>Equipment</span><span id="nav-eqp">-</span></a>
         <a class="nav-item" href="#machine"><span>Machine Detail</span><span id="nav-machine">-</span></a>
@@ -35,6 +36,7 @@
       </div>
       <div class="nav-section" data-nav-section="system-audit">
         <div class="nav-label">System / Audit</div>
+        <a class="nav-item" href="#data-quality"><span>Data Quality</span><span id="nav-data-quality">-</span></a>
         <a class="nav-item" href="#events"><span>Events</span><span id="nav-events">-</span></a>
       </div>
     </aside>
@@ -63,6 +65,58 @@
         </div>
       </header>
       <div class="layout">
+        <section class="factory-twin-shell" id="factory-twin-page" data-page-purpose="spatial-digital-twin" hidden>
+          <div class="factory-twin-toolbar" aria-label="Factory twin controls">
+            <div class="factory-twin-title">
+              <strong>Factory Spatial Digital Twin</strong>
+              <span id="factory-twin-provenance">SIMULATOR · AUTO_LAYOUT · INFERRED_VISUAL</span>
+            </div>
+            <div class="factory-twin-controls">
+              <label>
+                <span>Source</span>
+                <select id="factory-twin-source" class="button compact">
+                  <option value="SIMULATOR">Simulator live</option>
+                  <option value="CANONICAL_TWIN">Canonical replay</option>
+                </select>
+              </label>
+              <button class="button compact" id="factory-twin-overview" type="button">Overview</button>
+              <button class="button compact" id="factory-twin-selected-camera" type="button">Selected</button>
+              <button class="button compact" id="factory-twin-camera-mode" type="button">Orthographic</button>
+              <label class="toggle-control"><input id="factory-twin-labels" type="checkbox" checked /><span>Labels</span></label>
+              <span class="factory-twin-connection" id="factory-twin-connection">CONNECTING</span>
+              <span class="factory-twin-time">t=<strong id="factory-twin-time">0</strong></span>
+            </div>
+          </div>
+          <div class="factory-twin-stage" id="factory-twin-stage">
+            <div class="factory-twin-canvas" id="factory-twin-canvas" role="application" aria-label="Interactive three-dimensional factory twin"></div>
+            <div class="factory-twin-label-layer" id="factory-twin-label-layer" aria-hidden="true"></div>
+            <div class="factory-twin-message" id="factory-twin-message">Loading factory topology…</div>
+            <div class="factory-twin-camera-presets" id="factory-twin-camera-presets" aria-label="Operation camera presets"></div>
+            <aside class="factory-twin-inspector" id="factory-twin-inspector" aria-label="Factory entity inspector" hidden>
+              <div class="factory-twin-inspector-header">
+                <div>
+                  <span id="factory-twin-entity-type">ENTITY</span>
+                  <h2 id="factory-twin-entity-title">Select an entity</h2>
+                </div>
+                <button class="factory-twin-icon-button" id="factory-twin-inspector-close" type="button" title="Close inspector" aria-label="Close inspector">×</button>
+              </div>
+              <div class="factory-twin-inspector-body" id="factory-twin-inspector-body"></div>
+              <div class="factory-twin-inspector-actions" id="factory-twin-inspector-actions"></div>
+            </aside>
+          </div>
+          <div class="factory-twin-timeline">
+            <div>
+              <strong id="factory-twin-status-summary">Factory state ready</strong>
+              <span id="factory-twin-sequence">sequence 0</span>
+            </div>
+            <label id="factory-twin-replay-control" hidden>
+              <span>Replay time</span>
+              <input id="factory-twin-replay-time" type="range" min="0" max="0" value="0" />
+              <output id="factory-twin-replay-output">0</output>
+            </label>
+            <span id="factory-twin-transfer-summary">0 carriers · warehouse 0</span>
+          </div>
+        </section>
         <section class="kpis">
           <div class="panel kpi"><div class="kpi-label">Total WIP</div><div class="kpi-value" id="kpi-wip">0</div><div class="kpi-note" id="kpi-wip-note">A/B/C</div></div>
           <div class="panel kpi"><div class="kpi-label">Completed</div><div class="kpi-value" id="kpi-completed">0</div><div class="kpi-note">packed wafers</div></div>
@@ -435,6 +489,44 @@
             </div>
           </div>
         </section>
+        <section class="page-shell trace-shell" id="data-quality-page" data-page-purpose="production-data-quality">
+          <div class="panel-header">
+            <div>
+              <h2>Production Data Quality</h2>
+              <p class="section-kicker">Canonical ingestion readiness before policy and replay use</p>
+            </div>
+            <span id="data-quality-status">No diagnostics</span>
+          </div>
+          <section class="kpis data-quality-kpis" id="data-quality-kpis"></section>
+          <div class="inspector-grid data-quality-grid">
+            <div class="panel-lite">
+              <div class="panel-header compact-header"><h2>Issue Groups</h2><span id="data-quality-group-count">0 groups</span></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Code</th><th>Severity</th><th>Count</th></tr></thead>
+                  <tbody id="data-quality-groups-body"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel-lite">
+              <div class="panel-header compact-header"><h2>Freshness</h2><span id="data-quality-freshness">-</span></div>
+              <div class="point-detail" id="data-quality-freshness-detail"></div>
+            </div>
+            <div class="panel-lite data-quality-wide">
+              <div class="panel-header compact-header"><h2>Issues</h2><span id="data-quality-issue-count">0 issues</span></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Severity</th><th>Code</th><th>Record</th><th>Message</th></tr></thead>
+                  <tbody id="data-quality-issues-body"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel-lite data-quality-wide">
+              <div class="panel-header compact-header"><h2>Recommended Actions</h2><span>operator checklist</span></div>
+              <div class="point-detail" id="data-quality-actions"></div>
+            </div>
+          </div>
+        </section>
         <section class="split-grid" id="equipment">
           <div class="panel">
             <div class="panel-header"><h2>Equipment Matrix</h2><span id="equipment-count">0 tools</span></div>
@@ -485,6 +577,7 @@
     </main>
   </div>
   <script>{{ control_room_js }}</script>
+  <script type="module" src="/static/mes/dist/factory-twin.js"></script>
 
 </body>
 </html>

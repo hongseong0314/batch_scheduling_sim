@@ -123,11 +123,12 @@ def test_auto_mode_moves_tasks_through_completed_flow():
         json={'target_stage': 'AUTO', 'generate_every': 20, 'bootstrap_cycles': 0},
     )
     live = {}
-    for _ in range(35):
+    # Timed OHT adds authoritative A->B and B->C travel to the first-lot lead time.
+    for _ in range(45):
         live = client.get(
             '/api/v2/simulation/autoplay/status?step_cycles=1'
         ).json()['live']
-    assert live['time'] >= 35
+    assert live['time'] >= 45
     assert live['kpis']['completed'] > 0
     assert live['kpis']['total_wip'] >= 0
     assert live['active_chain']['counts']['recommendations'] >= 4

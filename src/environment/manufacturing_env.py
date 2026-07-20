@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 import numpy as np
 
 from src.data_generator import DataGenerator
+from src.environment.material_flow import MaterialFlowController
 from src.environment.process_a_env import ProcessA_Env
 from src.environment.process_b_env import ProcessB_Env
 from src.environment.process_c_env import ProcessC_Env
@@ -30,6 +31,10 @@ class ManufacturingEnv:
         self.env_B = ProcessB_Env(self.config)
         self.env_C = ProcessC_Env(self.config)
         self._stages = self._build_stage_registry()
+        twin_config = dict(self.config.get("factory_twin", {}) or {})
+        self.material_flow = MaterialFlowController(
+            dict(twin_config.get("transport", {}) or {})
+        )
 
         self.completed_tasks: List[Task] = []
 
@@ -153,10 +158,21 @@ class ManufacturingEnv:
         b_actions = incoming_actions.get("B") or {}
         c_actions = incoming_actions.get("C") or {}
 
+        # 0) Release authoritative OHT arrivals before downstream eligibility.
+        arrivals = self.material_flow.release_arrivals(self.time)
+        if arrivals.get("B"):
+            self.env_B.add_tasks(arrivals["B"])
+        if arrivals.get("C"):
+            self.env_C.add_tasks(arrivals["C"], current_time=self.time)
+
         # 1) Process A step.
         results_A = self.env_A.step(self.time, a_actions)
         if results_A["succeeded"]:
-            self.env_B.add_tasks(results_A["succeeded"])
+            immediate_arrivals = self.material_flow.dispatch(
+                results_A["succeeded"], "A", "B", self.time
+            )
+            if immediate_arrivals:
+                self.env_B.add_tasks(immediate_arrivals)
 
         # 2) Process B step.
         b_wait_uids = {task.uid for task in self.env_B.wait_pool}
@@ -168,7 +184,11 @@ class ManufacturingEnv:
         )
         results_B = self.env_B.step(self.time, sanitized_b_actions)
         if results_B["succeeded"]:
-            self.env_C.add_tasks(results_B["succeeded"], current_time=self.time)
+            immediate_arrivals = self.material_flow.dispatch(
+                results_B["succeeded"], "B", "C", self.time
+            )
+            if immediate_arrivals:
+                self.env_C.add_tasks(immediate_arrivals, current_time=self.time)
 
         # 3) Process C step.
         c_wait_uids = {task.uid for task in self.env_C.wait_pool}
@@ -220,6 +240,7 @@ class ManufacturingEnv:
         self.time = 0
         self.data_generator = DataGenerator()
         self.completed_tasks = []
+        self.material_flow.reset()
 
         for descriptor in self._stages.values():
             descriptor["env"].reset()
@@ -320,6 +341,7 @@ class ManufacturingEnv:
             self._iter_machine_tasks(self.env_B.machines),
             self.env_C.wait_pool,
             self._iter_machine_tasks(self.env_C.machines),
+            self.material_flow.in_transit_tasks(),
             self.env_C.completed_tasks,
             self.completed_tasks,
         ]
@@ -348,17 +370,24 @@ class ManufacturingEnv:
         c_wait_uids = [task.uid for task in self.env_C.wait_pool]
         a_finishing_now_uids = self._finishing_now_uids(self.env_A.machines)
         b_finishing_now_uids = self._finishing_now_uids(self.env_B.machines)
+        c_finishing_now_uids = self._finishing_now_uids(self.env_C.machines)
 
         return {
             "time": self.time,
             "max_steps": self.config.get("max_steps", 1000),
             "num_completed": len(self.completed_tasks),
             "tasks": tasks,
+            "material_flow": self.material_flow.state(self.time),
+            "warehouse": {
+                "completed_count": len(self.completed_tasks),
+                "recent_task_uids": [task.uid for task in self.completed_tasks[-48:]],
+            },
             "A": {
                 "machines": self._snapshot_machines_a(),
                 "wait_pool_uids": a_wait_uids,
                 "rework_pool_uids": a_rework_uids,
                 "finishing_now_uids": a_finishing_now_uids,
+                "output_uids": a_finishing_now_uids,
                 "queue_stats": {
                     "wait_pool_size": len(a_wait_uids),
                     "rework_pool_size": len(a_rework_uids),
@@ -369,6 +398,7 @@ class ManufacturingEnv:
                 "wait_pool_uids": b_wait_uids,
                 "rework_pool_uids": b_rework_uids,
                 "finishing_now_uids": b_finishing_now_uids,
+                "output_uids": b_finishing_now_uids,
                 "incoming_from_A_uids": a_finishing_now_uids,
                 "queue_stats": {
                     "wait_pool_size": len(b_wait_uids),
@@ -378,6 +408,8 @@ class ManufacturingEnv:
             "C": {
                 "machines": self._snapshot_machines_c(),
                 "wait_pool_uids": c_wait_uids,
+                "finishing_now_uids": c_finishing_now_uids,
+                "output_uids": c_finishing_now_uids,
                 "incoming_from_B_uids": b_finishing_now_uids,
                 "queue_stats": {"wait_pool_size": len(c_wait_uids)},
                 "last_pack_time": self.env_C.last_pack_time,

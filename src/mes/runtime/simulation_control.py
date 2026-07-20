@@ -13,12 +13,14 @@ def generate_tasks(context: Any, time_point: Optional[int] = None) -> Dict[str, 
     tasks = context.env.data_generator.generate_new_jobs(current_time)
     context.env.env_A.add_tasks(tasks)
     context.last_generation_time = current_time
-    return {
+    payload = {
         "time_point": current_time,
         "inserted_count": len(tasks),
         "task_uids": [task.uid for task in tasks],
         "queue_a_size": len(context.env.env_A.wait_pool),
     }
+    _commit_factory_twin(context)
+    return payload
 
 
 def maybe_generate_periodic_tasks(context: Any) -> Optional[Dict[str, Any]]:
@@ -211,6 +213,7 @@ def run_auto_cycle(context: Any) -> Dict[str, Any]:
         "time": context.env.time,
     }
     context.last_cycle = payload
+    _commit_factory_twin(context)
     return payload
 
 
@@ -238,6 +241,7 @@ def run_single_cycle(
     context.last_correlation_id = result.generated.plan.correlation_id
     payload = result.to_dict()
     context.last_cycle = payload
+    _commit_factory_twin(context)
     return payload
 
 
@@ -268,3 +272,9 @@ def run_until(context: Any, target_stage: str, max_cycles: int) -> Dict[str, Any
             stop_reason = "rejected"
             break
     return {"count": len(cycles), "stop_reason": stop_reason, "cycles": cycles}
+
+
+def _commit_factory_twin(context: Any) -> None:
+    service = getattr(context, "factory_twin", None)
+    if service is not None:
+        service.commit("SIMULATOR")

@@ -48,6 +48,23 @@ def default_runtime_config() -> Dict[str, Any]:
             "C_1": "PACK-02",
             "C_2": "PACK-03",
         },
+        "factory_twin": {
+            "enabled": True,
+            "source": "SIMULATOR",
+            "layout": {
+                "mode": "registry",
+                "operation_spacing": 28,
+                "equipment_spacing": 5,
+                "aisle_width": 6,
+            },
+            "transport": {
+                "mode": "immediate",
+                "default_travel_time": 2,
+                "route_travel_time": {"A>B": 3, "B>C": 3},
+            },
+            "rendering": {"max_visible_queue_items": 24, "labels_default": True},
+            "warehouse": {"enabled": True, "visible_slots": 48},
+        },
     }
 
 
@@ -109,6 +126,7 @@ def normalize_runtime_config(
         "equipment_display_names",
         "operations",
         "equipment",
+        "factory_twin",
     ):
         if key in data:
             config[key] = data[key]

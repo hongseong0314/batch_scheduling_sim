@@ -36,7 +36,7 @@ class CandidatePortfolioMixin:
     ) -> List[Dict[str, Any]]:
         stage = stage.upper()
         stage_state = decision_state.get(stage, {})
-        wait_pool = self._wait_pool(stage, stage_state)
+        wait_pool = self._wait_pool(stage, stage_state, decision_state)
         rework_pool = [int(uid) for uid in stage_state.get("rework_pool_uids", [])]
         if not wait_pool and not rework_pool:
             return []
@@ -99,7 +99,7 @@ class CandidatePortfolioMixin:
     ) -> List[Dict[str, Any]]:
         stage = "C"
         stage_state = decision_state.get(stage, {})
-        pool = self._candidate_pool(stage, stage_state)
+        pool = self._candidate_pool(stage, stage_state, decision_state)
         if not pool:
             return []
 
@@ -169,7 +169,7 @@ class CandidatePortfolioMixin:
     def _c_packer_candidates(self, decision_state: Dict[str, Any]) -> List[Dict[str, Any]]:
         stage = "C"
         stage_state = decision_state.get(stage, {})
-        pool = self._candidate_pool(stage, stage_state)
+        pool = self._candidate_pool(stage, stage_state, decision_state)
         if not pool:
             return []
 
@@ -282,9 +282,14 @@ class CandidatePortfolioMixin:
             return self.policy_stack.scheduler_b
         raise ValueError(f"stage {stage!r} does not use an A/B assignment scheduler")
 
-    def _wait_pool(self, stage: str, stage_state: Dict[str, Any]) -> List[int]:
+    def _wait_pool(
+        self,
+        stage: str,
+        stage_state: Dict[str, Any],
+        decision_state: Dict[str, Any],
+    ) -> List[int]:
         wait_pool = [int(uid) for uid in stage_state.get("wait_pool_uids", [])]
-        if stage == "B":
+        if stage == "B" and self._same_step_incoming_enabled(decision_state):
             incoming = [int(uid) for uid in stage_state.get("incoming_from_A_uids", [])]
             return self._dedupe(incoming + wait_pool)
         return self._dedupe(wait_pool)
@@ -521,12 +526,18 @@ class CandidatePortfolioMixin:
             reasons.append("high_compatibility")
         return reasons
 
-    def _candidate_pool(self, stage: str, stage_state: Dict[str, Any]) -> List[int]:
+    def _candidate_pool(
+        self,
+        stage: str,
+        stage_state: Dict[str, Any],
+        decision_state: Dict[str, Any],
+    ) -> List[int]:
         pool = [int(uid) for uid in stage_state.get("rework_pool_uids", [])]
         pool.extend(int(uid) for uid in stage_state.get("wait_pool_uids", []))
-        if stage == "B":
+        same_step_incoming = self._same_step_incoming_enabled(decision_state)
+        if stage == "B" and same_step_incoming:
             pool = [int(uid) for uid in stage_state.get("incoming_from_A_uids", [])] + pool
-        if stage == "C":
+        if stage == "C" and same_step_incoming:
             pool = pool + [int(uid) for uid in stage_state.get("incoming_from_B_uids", [])]
         seen = set()
         ordered = []
@@ -536,6 +547,11 @@ class CandidatePortfolioMixin:
             seen.add(uid)
             ordered.append(uid)
         return ordered
+
+    @staticmethod
+    def _same_step_incoming_enabled(decision_state: Dict[str, Any]) -> bool:
+        material_flow = dict(decision_state.get("material_flow", {}) or {})
+        return str(material_flow.get("mode", "immediate")).lower() == "immediate"
 
     def _is_machine_available(
         self,

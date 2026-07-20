@@ -76,6 +76,16 @@
     }
 
     async function refresh(stepCycles = 0) {
+      if (location.hash === "#factory-twin") {
+        const live = running
+          ? await fetch(`/api/v2/simulation/autoplay/status?step_cycles=${stepCycles}`).then(r => r.json()).then(x => x.live)
+          : await fetch("/api/v2/fab/live").then(r => r.json());
+        document.getElementById("sim-time").textContent = String(live.time ?? 0);
+        document.getElementById("nav-eqp").textContent = String(live.equipment?.length || "-");
+        document.getElementById("nav-gantt").textContent = String(live.kpis?.busy_machines || "-");
+        document.getElementById("nav-portfolio").textContent = String(live.candidate_portfolio?.count || 0);
+        return;
+      }
       const live = running
         ? await fetch(`/api/v2/simulation/autoplay/status?step_cycles=${stepCycles}`).then(r => r.json()).then(x => x.live)
         : await fetch("/api/v2/fab/live").then(r => r.json());
@@ -87,7 +97,7 @@
 
     async function loadAiDevSummary() {
       try {
-        const [policyStack, decisionCycles, policyVariants, scenarios, experiments, runs, processChatModels, agentRuns] = await Promise.all([
+        const [policyStack, decisionCycles, policyVariants, scenarios, experiments, runs, processChatModels, agentRuns, dataQuality] = await Promise.all([
           fetch("/api/v2/ai-dev/policy-stack").then(r => r.json()),
           fetch(`/api/v2/ai-dev/decision-cycles?limit=${AI_DEV_CYCLE_LIMIT}`).then(r => r.json()),
           fetch("/api/v2/ai-dev/policy-variants").then(r => r.json()),
@@ -96,8 +106,9 @@
           fetch("/api/v2/runs").then(r => r.json()),
           fetch("/api/v2/process-chat/models").then(r => r.json()),
           fetch("/api/v2/agent-runs?limit=25").then(r => r.json()),
+          fetch("/api/v2/production/data-quality").then(r => r.json()),
         ]);
-        return { policyStack, decisionCycles, policyVariants, scenarios, experiments, runs, processChatModels, agentRuns };
+        return { policyStack, decisionCycles, policyVariants, scenarios, experiments, runs, processChatModels, agentRuns, dataQuality };
       } catch (error) {
         return {
           policyStack: {},
@@ -108,6 +119,7 @@
           runs: { items: [] },
           processChatModels: { items: [] },
           agentRuns: { items: [] },
+          dataQuality: {},
         };
       }
     }
@@ -796,6 +808,7 @@
       renderAiDev(live, aiDev);
       renderRunSelector(aiDev.runs || {});
       renderChatModels(aiDev.processChatModels || {});
+      renderDataQuality(aiDev.dataQuality || {});
       renderEvents(live.recent_events || []);
       renderGantt(gantt || {}, live);
       updateNavState();
@@ -1760,6 +1773,61 @@
         </div>`).join("") || "<span class='kpi-note'>No events</span>";
     }
 
+    function renderDataQuality(payload) {
+      const status = payload.status || "EMPTY";
+      const dashboard = payload.dashboard || {};
+      const counts = payload.counts || {};
+      const freshness = payload.freshness || {};
+      const groups = Object.values(payload.issue_groups || {});
+      const issues = payload.issues || [];
+      document.getElementById("nav-data-quality").textContent =
+        issues.length ? `${issues.length}` : status.toLowerCase();
+      document.getElementById("data-quality-status").textContent =
+        `${status} · ${counts.canonical_records || 0} canonical · ${issues.length} issues`;
+      document.getElementById("data-quality-kpis").innerHTML = [
+        ["Status", status, "readiness"],
+        ["Raw", counts.raw_records || 0, "source rows"],
+        ["Canonical", counts.canonical_records || 0, "replay records"],
+        ["Blocking", dashboard.blocking_issue_count || 0, "error issues"],
+        ["Warnings", dashboard.warning_count || 0, "warn issues"],
+        ["Late", dashboard.late_event_count || 0, `threshold ${payload.late_threshold ?? "-"}`],
+      ].map(item => `
+        <div class="panel kpi">
+          <div class="kpi-label">${escapeText(item[0])}</div>
+          <div class="kpi-value">${escapeText(item[1])}</div>
+          <div class="kpi-note">${escapeText(item[2])}</div>
+        </div>`).join("");
+      document.getElementById("data-quality-group-count").textContent = `${groups.length} groups`;
+      document.getElementById("data-quality-groups-body").innerHTML = groups.map(group => `
+        <tr>
+          <td><code>${escapeText(group.code || "-")}</code></td>
+          <td><span class="${statusClass(group.severity || "WARN")}">${escapeText(group.severity || "-")}</span></td>
+          <td>${escapeText(group.count || 0)}</td>
+        </tr>`).join("") || "<tr><td colspan='3'>No issue groups</td></tr>";
+      document.getElementById("data-quality-freshness").textContent =
+        `lag ${freshness.event_lag ?? "-"}`;
+      document.getElementById("data-quality-freshness-detail").innerHTML = `
+        <dl>
+          <dt>Latest event</dt><dd>${escapeText(freshness.latest_event_time ?? "-")}</dd>
+          <dt>Latest ingest</dt><dd>${escapeText(freshness.latest_ingest_time ?? "-")}</dd>
+          <dt>Event lag</dt><dd>${escapeText(freshness.event_lag ?? "-")}</dd>
+          <dt>Out of order</dt><dd>${escapeText(dashboard.out_of_order_event_count || 0)}</dd>
+          <dt>Conflicts</dt><dd>${escapeText(dashboard.conflict_count || 0)}</dd>
+        </dl>`;
+      document.getElementById("data-quality-issue-count").textContent = `${issues.length} issues`;
+      document.getElementById("data-quality-issues-body").innerHTML = issues.slice(0, 200).map(issue => `
+        <tr>
+          <td><span class="${statusClass(issue.severity || "WARN")}">${escapeText(issue.severity || "-")}</span></td>
+          <td><code>${escapeText(issue.code || "-")}</code></td>
+          <td><code>${escapeText(issue.record_id || issue.mapping_id || issue.source_key || "-")}</code></td>
+          <td>${escapeText(issue.message || "-")}</td>
+        </tr>`).join("") || "<tr><td colspan='4'>No data quality issues</td></tr>";
+      document.getElementById("data-quality-actions").innerHTML = `
+        <dl>${(payload.recommended_actions || []).map((action, index) =>
+          `<dt>${index + 1}</dt><dd>${escapeText(action)}</dd>`
+        ).join("") || "<dt>-</dt><dd>No recommended action.</dd>"}</dl>`;
+    }
+
     function renderGantt(gantt, live) {
       renderFlow(gantt.flow || [], live);
       document.getElementById("gantt-window").textContent =
@@ -1986,6 +2054,8 @@
       document.body.classList.toggle("ai-dev-page", hash === "#ai-dev");
       document.body.classList.toggle("assignment-trace-page-active", hash === "#assignment-trace");
       document.body.classList.toggle("genealogy-page-active", hash === "#genealogy");
+      document.body.classList.toggle("data-quality-page-active", hash === "#data-quality");
+      document.body.classList.toggle("factory-twin-page-active", hash === "#factory-twin");
       document.querySelectorAll(".nav-item").forEach(item => {
         item.classList.toggle("active", item.getAttribute("href") === hash);
       });
@@ -2132,6 +2202,22 @@
         collapsed ? "Show full raw JSON" : "Collapse raw JSON";
     };
     window.addEventListener("hashchange", updateNavState);
+    window.openMesMachineDetail = async equipmentId => {
+      await openMachineDetail(String(equipmentId || ""));
+    };
+    window.openMesAssignmentTrace = async ({ equipmentId = "", taskUid = "" } = {}) => {
+      document.getElementById("trace-equipment-id").value = equipmentId;
+      document.getElementById("trace-task-uid").value = taskUid;
+      location.hash = "assignment-trace";
+      await loadAssignmentTrace({ equipment_id: equipmentId, task_uid: taskUid });
+    };
+    window.openMesGenealogy = async ({ taskUid = "", equipmentId = "" } = {}) => {
+      document.getElementById("genealogy-entity-type").value = taskUid ? "UNIT" : "EQUIPMENT";
+      document.getElementById("genealogy-canonical-id").value = taskUid || equipmentId;
+      location.hash = "genealogy";
+      await loadGenealogy();
+    };
+    updateNavState();
     renderChatThread();
     setInterval(() => refresh(running ? Number(document.getElementById("speed").value) : 0), 1000);
     refresh(0);

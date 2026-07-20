@@ -23,6 +23,26 @@ models:
       timeout: 120
       headers:
         X-MES-Agent: process-chat
+  - name: Gemma4:12B Coder Fable5 Composer2.5 Q4
+    provider: ollama
+    model: gemma4:12b-coder-fable5-composer25-q4
+    apiBase: http://localhost:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+    defaultCompletionOptions:
+      reasoning: true
+      contextLength: 128000
+      maxTokens: 8000
+      temperature: 1
+      topP: 0.95
+      topK: 64
+      keepAlive: 30m
+    requestOptions:
+      timeout: 120
+      headers:
+        X-MES-Agent: process-chat
   - name: OpenAI GPT-4.1 Mini
     provider: openai
     model: gpt-4.1-mini

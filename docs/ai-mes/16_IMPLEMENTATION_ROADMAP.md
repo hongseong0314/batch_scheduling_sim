@@ -1,7 +1,7 @@
 # Implementation Roadmap
 
 Status: canonical
-Last updated: 2026-06-12
+Last updated: 2026-07-17
 
 ## Reader
 
@@ -370,6 +370,8 @@ Follow-on deliverables:
 
 ## Phase 8C: Legacy Ingestion Contract V1
 
+Status: implemented and extended by Production Data Backbone V1.
+
 Deliverables:
 
 - `RawSourceRecord` DTO in `src/mes/ingestion.py`,
@@ -391,13 +393,10 @@ Acceptance:
 - source-key mapping resolve works after ingestion with a canonical id,
 - raw-only records can be stored before a mapping is available.
 
-Future deliverables:
-
-- source-specific MES/FDC/RMS/ERP ingestion adapters,
-- event-sourced WIP reconstruction from canonical ingestion records,
-- conflict review workflow for mapping collisions,
-- production PostgreSQL DDL and migration scripts,
-- source-system data quality dashboard and alerting.
+Follow-on deliverables now live in
+[19_PRODUCTION_DATA_BACKBONE_V1.md](19_PRODUCTION_DATA_BACKBONE_V1.md),
+[20_SOURCE_ADAPTER_SPEC.md](20_SOURCE_ADAPTER_SPEC.md), and
+[21_POSTGRES_SCHEMA.md](21_POSTGRES_SCHEMA.md).
 
 ## Phase 8D: Production Digital Twin Backbone V1
 
@@ -443,12 +442,7 @@ Acceptance:
 - canonical genealogy can explain which raw/canonical records produced a unit,
   lot, equipment, recipe, assignment, or quality entity.
 
-Future deliverables:
-
-- source-specific adapter packages for MES/FDC/RMS/ERP event vocabularies,
-- out-of-order event conflict diagnostics,
-- production PostgreSQL event store,
-- WIP reconstruction freshness and data-quality monitoring.
+Follow-on deliverables now live in Phase 8G below.
 
 ## Phase 8E: Decision And Policy Platform V1
 
@@ -500,28 +494,99 @@ Acceptance:
 - legacy decision/outcome records remain separate from operator review,
 - approval queue exposes the current workflow state for each proposal.
 
+## Phase 8G: Production Data Backbone V1
+
+Status: implemented for V1 alpha.
+
+Deliverables:
+
+- PostgreSQL target schema contract in `src/mes/persistence/postgres_schema.py`,
+- migration draft in
+  `src/mes/persistence/migrations/postgres/001_production_data_backbone_v1.sql`,
+- adapter interface package under `src/mes/ingestion/adapters/`,
+- source-specific MES WIP/equipment/assignment adapters,
+- FDC quality/equipment-event adapters,
+- RMS recipe/recipe-eligibility adapters,
+- ERP order/lot context adapter,
+- compatibility facade in `src/mes/legacy_adapters.py`,
+- framework-neutral ingestion job/backfill runner in `src/mes/jobs/`,
+- `GET /api/v2/ingestion/jobs`,
+- `GET /api/v2/ingestion/jobs/runs`,
+- `POST /api/v2/ingestion/jobs/run`,
+- data-quality dashboard payload with issue groups and late/out-of-order event
+  diagnostics,
+- `/mes#data-quality` UI page,
+- replay stress tests for out-of-order canonical input.
+
+Acceptance:
+
+- source rows can flow through adapter -> raw evidence -> canonical event ->
+  source mapping,
+- batch and backfill ingestion share the same canonical ingestion path,
+- data quality shows missing, duplicate, conflict, late, and out-of-order
+  issues,
+- PostgreSQL target tables cover canonical ingestion, action proposals, reviews,
+  legacy decisions, outcomes, and ingestion job runs,
+- existing simulator-backed MES APIs remain compatible.
+
+## Phase 8H: Factory Spatial Digital Twin V1
+
+Status: implemented.
+
+Deliverables:
+
+- versioned `factory-twin.v1` layout, snapshot, and delta contracts,
+- deterministic Operation Registry auto-layout with generic future-operation
+  fallback,
+- common simulator and canonical replay source adapters,
+- immediate-compatible and optional timed-OHT material flow,
+- Factory Twin REST APIs and ordered WebSocket delta stream,
+- Three.js CAD-like A/B/C factory with configurable equipment, queues, rails,
+  carriers, and finished-goods warehouse,
+- equipment/task/carrier inspection and links to Machine Detail, Assignment
+  Trace, and Genealogy,
+- canonical event-time replay slider,
+- desktop/mobile rendering and payload performance budgets,
+- browser WebGL, movement, reconnect, interaction, and lifecycle regression
+  tests.
+
+Acceptance:
+
+- Python remains the authoritative manufacturing state,
+- simulator and canonical replay validate against the same spatial contract,
+- timed OHT blocks downstream eligibility until arrival,
+- the scene is nonblank and correctly framed on desktop/mobile,
+- inferred visual movement is distinguished from simulated or observed
+  movement,
+- no 3D interaction creates a direct equipment command.
+
+Detailed implementation and operator workflow:
+[22_FACTORY_SPATIAL_DIGITAL_TWIN.md](22_FACTORY_SPATIAL_DIGITAL_TWIN.md).
+
 ## Next Priorities
 
 Recommended next build order:
 
-1. Source adapter scheduling/backfill jobs for MES/FDC/RMS/ERP ingestion.
-2. Production PostgreSQL schema and migrations for canonical/event/proposal
-   records.
-3. Auth, roles, and production outbox submission for write-capable workflows.
-4. Full source-data quality dashboard for duplicate, late, missing, and
-   conflicting events.
-5. Connect the provider-driven A/B Process Quality Intelligence and generic
+1. PostgreSQL repository implementation behind the existing store interface.
+2. Real connector probes for one MES WIP table, one FDC quality/event table, and
+   one RMS recipe table.
+3. Approved production spatial mapping for real operation zones, equipment
+   coordinates, OHT routes, and observed carrier events; until then the twin
+   must retain `AUTO_LAYOUT` or `INFERRED_VISUAL` provenance.
+4. Auth, roles, and production outbox submission for write-capable workflows.
+5. Data quality alerting and conflict review workflow.
+6. Connect the provider-driven A/B Process Quality Intelligence and generic
    Agent Visual Analytics contracts to canonical FDC/event-time telemetry,
    preserving source/time provenance and simulator compatibility.
-6. Add approval-gated write-tool contract for future L4/operator workflows,
+7. Add approval-gated write-tool contract for future L4/operator workflows,
    keeping current `/mes#chat` default read-only.
-7. Scenario preset library and config controls for balanced/A-bottleneck/
+8. Scenario preset library and config controls for balanced/A-bottleneck/
    B-bottleneck/stress experiments.
-8. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
-9. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
-10. Richer FeatureSnapshot and state diff indexing for every decision cycle.
-11. Quality/rework lineage records linked to task, recipe/APC, and equipment.
-12. Recipe/APC command endpoints and operator hold/release/approval workflows.
+9. Duplicate same-cycle reservation locks for multi-command AUTO cycles.
+10. Learning-policy adapter contract for L1/L2/L3/L4 experiment variants.
+11. Richer FeatureSnapshot and state diff indexing for every decision cycle.
+12. Quality/rework lineage records linked to task, recipe/APC, and equipment.
+13. Recipe/APC command endpoints and operator hold/release/approval workflows.
 
 ## Phase 9: Operator Workflow And Production Boundaries
 

@@ -1,7 +1,7 @@
 # Runtime Config
 
 Status: canonical production-transition specification
-Last updated: 2026-05-31
+Last updated: 2026-07-17
 
 ## Reader
 
@@ -100,6 +100,26 @@ display:
     A_1: LITHO-02
     B_0: CLEAN-01
     C_0: PACK-01
+
+factory_twin:
+  enabled: true
+  source: SIMULATOR
+  layout:
+    mode: registry
+    operation_spacing: 28
+    equipment_spacing: 5
+    aisle_width: 6
+  transport:
+    mode: timed_oht
+    oht_time:
+      A>B: 3
+      B>C: 3
+  rendering:
+    max_visible_queue_items: 24
+    labels_default: true
+  warehouse:
+    enabled: true
+    visible_slots: 48
 ```
 
 The loader normalizes this friendly shape into the existing `ManufacturingEnv`
@@ -114,6 +134,50 @@ flat keys:
     "equipment_display_names": {"A_0": "LITHO-01"}
 }
 ```
+
+## OHT Travel Time
+
+The default runtime uses authoritative `timed_oht` transport. `oht_time` may be
+a route map when each handoff has a different duration:
+
+```yaml
+transport:
+  mode: timed_oht
+  oht_time:
+    A>B: 3
+    B>C: 5
+```
+
+It may also be one scalar applied to every route:
+
+```yaml
+transport:
+  mode: timed_oht
+  oht_time: 3
+```
+
+The older `default_travel_time` and `route_travel_time` keys remain accepted for
+backward compatibility. New runtime profiles should use `oht_time`.
+
+The dedicated Factory Twin profile uses the same contract:
+
+```text
+config/mes-runtime-factory-twin.yaml
+```
+
+Run it with:
+
+```bash
+MES_RUNTIME_CONFIG=config/mes-runtime-factory-twin.yaml \
+  .venv/bin/python -m uvicorn src.mes.api:app --host 127.0.0.1 --port 8000
+```
+
+In `timed_oht` mode, A-to-B and B-to-C outputs remain `IN_TRANSIT` until their
+configured arrival time. A task belongs to the OHT transfer during this interval
+and is added to the downstream Wait Pool only on arrival. This changes downstream
+candidate eligibility and is therefore domain behavior, not just browser
+animation. Layout settings affect only visualization and must not enter
+L1/L2/L3/L4 policy inputs.
 
 ## Boundary
 

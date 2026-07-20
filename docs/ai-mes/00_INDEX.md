@@ -1,7 +1,7 @@
 # AI MES Documentation Index
 
 Status: canonical navigation index
-Last updated: 2026-06-12
+Last updated: 2026-07-17
 
 This folder is the source of truth for the AI MES architecture, runtime,
 production-transition contracts, API, UI, and roadmap.
@@ -23,8 +23,8 @@ integration path, and UI reading path.
 | New reader / non-MES reader | `01 -> 02 -> 03 -> 04 -> 17` |
 | AI policy developer | `01 -> 03 -> 04 -> 05 -> 09 -> 18 -> 16` |
 | Backend/API developer | `01 -> 05 -> 06 -> 07 -> 10 -> 17` |
-| UI developer | `01 -> 08 -> 07 -> 05 -> 17` |
-| Production integration engineer | `01 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15` |
+| UI / spatial twin developer | `01 -> 08 -> 22 -> 07 -> 13 -> 17` |
+| Production integration engineer | `01 -> 10 -> 11 -> 12 -> 13 -> 19 -> 20 -> 21 -> 14 -> 15` |
 | Project planner | `01 -> 15 -> 16 -> 17` |
 
 ## Architecture At A Glance
@@ -33,6 +33,7 @@ integration path, and UI reading path.
 flowchart TD
   Sources["Legacy MES / RMS / FDC / ERP / equipment data"] --> Ingest["Canonical ingestion"]
   Ingest --> Twin["AI MES digital twin / decision_state"]
+  Twin --> Spatial["Factory spatial twin projection"]
   Twin --> L1["L1 local candidate portfolio"]
   L1 --> L2["L2 process annotation"]
   L2 --> L4["L4 objective weights"]
@@ -75,6 +76,10 @@ AI MES recommends. Legacy MES decides whether and how to execute.
 | 16 | [16_IMPLEMENTATION_ROADMAP.md](16_IMPLEMENTATION_ROADMAP.md) | Project planners | Build phases, acceptance criteria, tests, migration strategy |
 | 17 | [17_CURRENT_IMPLEMENTATION_STATUS.md](17_CURRENT_IMPLEMENTATION_STATUS.md) | Everyone | Current implementation snapshot and what is not implemented |
 | 18 | [18_AGENT_VISUAL_ANALYTICS_V1.md](18_AGENT_VISUAL_ANALYTICS_V1.md) | Agent/UI developers | Generic equipment telemetry tools and typed Active Inspector artifacts |
+| 19 | [19_PRODUCTION_DATA_BACKBONE_V1.md](19_PRODUCTION_DATA_BACKBONE_V1.md) | Production integration engineers | PostgreSQL-ready canonical ingestion, jobs, data quality, and replay backbone |
+| 20 | [20_SOURCE_ADAPTER_SPEC.md](20_SOURCE_ADAPTER_SPEC.md) | Integration/data engineers | MES/FDC/RMS source adapter interface and extension rules |
+| 21 | [21_POSTGRES_SCHEMA.md](21_POSTGRES_SCHEMA.md) | Database/backend engineers | PostgreSQL schema contract and migration target |
+| 22 | [22_FACTORY_SPATIAL_DIGITAL_TWIN.md](22_FACTORY_SPATIAL_DIGITAL_TWIN.md) | Manufacturing, UI, and twin engineers | Three.js factory, OHT transport, spatial contracts, live and canonical replay guide |
 | 99 | [archive/README.md](archive/README.md) | Maintainers | Archived planning docs and supersession notes |
 
 ## Source Of Truth Rules
@@ -87,6 +92,13 @@ AI MES recommends. Legacy MES decides whether and how to execute.
 - Treat `src/mes/rule_engine.py` as the execution gate.
 - Treat `src/mes/action_proposals.py` as the production-facing command
   boundary. AI commands become legacy-safe Action Proposals.
+- Treat `src/mes/ingestion/adapters/` as the production source adapter boundary.
+- Treat `src/mes/persistence/postgres_schema.py` and
+  `src/mes/persistence/migrations/postgres/` as the PostgreSQL target contract.
+- Treat `src/mes/factory_twin/` as the versioned spatial projection boundary;
+  the browser must not become a second manufacturing state authority.
+- Treat `frontend/factory-twin/src/` as the Three.js renderer source. Generated
+  assets under `src/mes/ui/static/dist/` are build output, not hand-edited code.
 - Treat `src/mes/api.py` as route wiring only. Runtime payload builders and
   feature routers live under `src/mes/runtime/`.
 - Treat `src/mes/ui/templates/control_room.html` and

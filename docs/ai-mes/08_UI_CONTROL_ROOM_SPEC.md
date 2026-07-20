@@ -1,7 +1,7 @@
 # UI Control Room Specification
 
 Status: canonical
-Last updated: 2026-06-12
+Last updated: 2026-07-17
 
 ## Reader
 
@@ -333,6 +333,17 @@ Current implementation:
   inspector/table primitives so they can grow without one-off layout rules.
 - `/mes#genealogy` shows Digital Twin Genealogy V1 with task, lot, equipment,
   execution ledger, state-at-time, run selector, and timeline panels.
+- `/mes#factory-twin` shows Factory Spatial Digital Twin V1 as a full primary
+  Three.js workspace. It renders registry-driven operations, configured
+  equipment counts, wait/rework/incoming/output queues, OHT rails and carriers,
+  and the finished-goods warehouse from `factory-twin.v1` payloads.
+- The factory twin supports simulator live state and canonical event-time
+  replay with one renderer. Its header always shows state, spatial, and
+  transport provenance so inferred movement is not presented as observed data.
+- Selecting an equipment or task opens a compact inspector with stable ids and
+  links to Machine Detail, Assignment Trace, and Genealogy. On mobile the
+  sidebar is removed from this workspace and the inspector becomes a fixed
+  bottom drawer over the scene.
 - It already shows WIP, equipment, decision chain, events, Gantt, autoplay,
   reset, A/B machine quality detail, C machine packing detail, L3 budget plan,
   selected candidates, L2 annotations, L3/L4 policy ids, and a Candidate
@@ -437,6 +448,7 @@ Avoid vague phrases:
 | Event timeline | `/api/v1/events` | same plus simulator event linkage |
 | Gantt | `/api/v2/gantt` | same |
 | Machine detail | `/api/v2/equipment/{id}/detail` | A/B/C detail coverage |
+| Factory spatial twin | `/api/v2/factory-twin/layout`, `/api/v2/factory-twin/snapshot`, `/api/v2/factory-twin/entity/{type}/{id}`, `/api/v2/factory-twin/replay-range`, `WS /api/v2/factory-twin/stream` | same contract with production authorization and observed spatial mapping when available |
 
 ## Process A Spatial Quality Inspector
 

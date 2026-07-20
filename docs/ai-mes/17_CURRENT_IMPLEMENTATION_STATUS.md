@@ -1,7 +1,7 @@
 # Current Implementation Status
 
 Status: canonical implementation snapshot
-Last updated: 2026-06-12
+Last updated: 2026-07-17
 
 ## Reader
 
@@ -33,6 +33,7 @@ flowchart LR
   Done --> Trace["traceability and AI dev console"]
   Done --> Agent["read-only LLM process agent"]
   Done --> Boundary["action proposal boundary"]
+  Done --> Spatial["Three.js factory spatial twin"]
 
   Gap["Remaining production gaps"] --> Auth["auth/roles/security"]
   Gap --> Ops["operator approval and legacy submission"]
@@ -58,8 +59,9 @@ manufacturing control system.
 | Runtime APIs | Live state, Gantt, equipment detail, decision chain, assignment trace, genealogy, candidate portfolio, AI dev, experiments |
 | Store | In-memory store plus SQLite JSON payload and normalized ledger indexes |
 | UI | `/mes` control room with Fab, Flow/Gantt, Equipment, Machine Detail, Decision Chain, Assignment Trace, Candidate Portfolio, AI Dev Console, Chat, Events |
+| Factory spatial twin | `/mes#factory-twin` with registry-driven 3D equipment, queues, OHT rails/carriers, warehouse, live simulator stream, canonical replay, and MES trace links |
 | Agent tools | Read-only MES/APC chat agent with Continue-style config, Ollama/OpenAI-compatible providers, A/B/C layered tools, generic equipment telemetry/anomaly tools, typed visual artifacts, Active Inspector, and agent run audit |
-| Production boundary | Operation registry, source key mapping, ingestion contracts, production schema/data-quality diagnostics, canonical twin replay/genealogy, action proposal boundary, review-gated proposal workflow |
+| Production boundary | Operation registry, source key mapping, ingestion contracts, PostgreSQL target schema, source adapter registry, ingestion job/backfill runner, production schema/data-quality diagnostics, canonical twin replay/genealogy, action proposal boundary, review-gated proposal workflow |
 
 ## Current Default Policy Stack
 
@@ -81,6 +83,10 @@ C: 3 tools, batch_size=4, process_time=2, max_packs_per_step=3
 Display names are configurable through `config/mes-runtime.yaml` and
 `MES_RUNTIME_CONFIG`; canonical simulator ids remain stable state/action keys.
 
+The default runtime preserves immediate A-to-B and B-to-C transfer semantics.
+`config/mes-runtime-factory-twin.yaml` enables authoritative timed OHT for
+spatial experiments and downstream-arrival eligibility tests.
+
 ## Production-Transition Capabilities
 
 Implemented V1 production-transition surfaces:
@@ -90,10 +96,14 @@ Implemented V1 production-transition surfaces:
 - source key mapping,
 - raw source and canonical ingestion records,
 - canonical production schema contract endpoint,
-- source data quality diagnostics,
+- PostgreSQL target schema and migration draft,
+- source-specific MES/FDC/RMS/ERP adapters,
+- framework-neutral ingestion job/backfill runner,
+- source data quality diagnostics and `/mes#data-quality` UI panel,
 - canonical digital twin replay and policy-ready decision state,
 - canonical entity genealogy with raw evidence,
 - canonical twin recommendation run into action proposal,
+- common `factory-twin.v1` projection for simulator and canonical replay,
 - source-specific legacy adapter examples,
 - decision dataset and policy evaluation summary APIs,
 - approval queue and action proposal review records,
@@ -112,16 +122,22 @@ Remaining gaps:
   scale,
 - production reservation locks and role-enforced operator approval workflows,
 - auth, roles, and tenant/security model,
-- normalized PostgreSQL schema and migrations,
-- source adapter scheduling/backfill jobs through Airflow, Cron, or a similar
-  orchestration layer,
+- PostgreSQL repository implementation and operational migrations,
+- Airflow, Cron, or equivalent orchestration wired to the framework-neutral
+  ingestion job runner,
 - primary event-sourced digital twin replacing simulator state for live runtime,
-- source data quality dashboard and alerting workflows,
+- data quality alerting and conflict review workflows,
 - learning-based policy training and model deployment,
-- production MES/RMS/FDC/ERP adapters hardened against late, duplicate, missing,
-  and conflicting source events.
+- production MES/RMS/FDC/ERP adapters hardened against live source credentials,
+  pagination, watermarks, late events, duplicate events, missing keys, and
+  conflicting source records,
 - production event-time telemetry adapter for Agent Visual Analytics; current
-  visual queries read simulator event logs and label the time basis explicitly.
+  visual queries read simulator event logs and label the time basis explicitly,
+- approved production spatial mapping for real operation/equipment positions,
+  observed OHT routes, and carrier telemetry; the current twin uses configured
+  or deterministic auto-layout and labels inferred movement explicitly,
+- route optimization, collision avoidance, robotics physics, and CAD/BIM import;
+  these are intentionally outside Factory Spatial Digital Twin V1.
 
 ## Current Boundary
 

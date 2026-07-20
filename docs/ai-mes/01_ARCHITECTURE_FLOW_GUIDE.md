@@ -1,7 +1,7 @@
 # AI MES Architecture Flow Guide
 
 Status: canonical onboarding guide
-Last updated: 2026-05-31
+Last updated: 2026-07-17
 
 ## Reader
 
@@ -199,6 +199,22 @@ flowchart TD
   Cmd --> SimAction["Simulator action in MVP"]
   Cmd --> Proposal["Action proposal in production path"]
 ```
+
+The same two state sources also feed one spatial projection:
+
+```mermaid
+flowchart LR
+  SimState["simulator decision_state"] --> Spatial["FactoryTwinSnapshot V1"]
+  CanonState["canonical decision_state"] --> Spatial
+  Registry["OperationRegistry layout"] --> Spatial
+  Spatial --> Scene["Three.js factory twin"]
+  Scene --> Inspect["equipment / queue / task / carrier inspection"]
+  Inspect --> Trace["machine detail / assignment trace / genealogy"]
+```
+
+The spatial twin visualizes authoritative state; it does not become another
+scheduler or equipment controller. See
+[22_FACTORY_SPATIAL_DIGITAL_TWIN.md](22_FACTORY_SPATIAL_DIGITAL_TWIN.md).
 
 This is why the code keeps environment state transitions separate from policies.
 Policies should not read simulator internals directly if the same logic must
@@ -400,6 +416,7 @@ For a non-MES reader:
 3. [04_LAYERED_AI_DECISION_ARCHITECTURE.md](04_LAYERED_AI_DECISION_ARCHITECTURE.md)
 4. [05_RUNTIME_HARNESS_RULE_ENGINE.md](05_RUNTIME_HARNESS_RULE_ENGINE.md)
 5. [13_PRODUCTION_DIGITAL_TWIN_BACKBONE.md](13_PRODUCTION_DIGITAL_TWIN_BACKBONE.md)
+6. [22_FACTORY_SPATIAL_DIGITAL_TWIN.md](22_FACTORY_SPATIAL_DIGITAL_TWIN.md)
 
 For an AI/policy developer:
 
@@ -414,6 +431,7 @@ For a production integration engineer:
 2. [11_LEGACY_SOURCE_KEY_MAPPING.md](11_LEGACY_SOURCE_KEY_MAPPING.md)
 3. [12_LEGACY_INGESTION_CONTRACT.md](12_LEGACY_INGESTION_CONTRACT.md)
 4. [13_PRODUCTION_DIGITAL_TWIN_BACKBONE.md](13_PRODUCTION_DIGITAL_TWIN_BACKBONE.md)
+5. [22_FACTORY_SPATIAL_DIGITAL_TWIN.md](22_FACTORY_SPATIAL_DIGITAL_TWIN.md)
 
 ## Current Maturity
 
@@ -425,6 +443,8 @@ Implemented:
 - Read-only MES/APC chat agent with Continue-style model config.
 - Operation registry, source key mapping, ingestion, canonical twin preview.
 - Action proposal boundary with `direct_equipment_control=false`.
+- Factory Spatial Digital Twin with Three.js equipment/queue/OHT/warehouse
+  rendering, simulator live stream, and canonical replay.
 
 Not implemented:
 

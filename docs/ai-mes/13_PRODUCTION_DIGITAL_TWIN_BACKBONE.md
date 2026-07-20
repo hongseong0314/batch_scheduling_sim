@@ -1,7 +1,7 @@
 # Production Digital Twin Backbone
 
 Status: canonical production-transition specification
-Last updated: 2026-05-31
+Last updated: 2026-07-17
 
 ## Reader
 
@@ -123,6 +123,30 @@ It also exposes production data foundation diagnostics:
 - missing `operation_id` warnings,
 - canonical entity genealogy with raw evidence.
 
+## Spatial Projection
+
+Factory Spatial Digital Twin V1 projects both simulator and canonical state
+through one renderer-facing contract:
+
+```mermaid
+flowchart LR
+  Sim["SIMULATOR decision_state"] --> Snapshot["FactoryTwinSnapshot V1"]
+  Canon["CANONICAL_TWIN decision_state"] --> Snapshot
+  Registry["OperationRegistry"] --> Layout["deterministic spatial layout"]
+  Layout --> Snapshot
+  Snapshot --> Three["Three.js factory workspace"]
+```
+
+This projection does not create a second manufacturing state model. Canonical
+event replay remains the authority for task, equipment, queue, and time state;
+the spatial layer adds deterministic coordinates, rendering provenance, and
+bounded presentation details.
+
+The same `factory-twin.v1` schema is validated for both sources. If a configured
+operation is absent from canonical evidence, its equipment is `UNKNOWN` rather
+than idle. Canonical replay at the same run and event time produces the same
+spatial state.
+
 ## Supported Event Semantics
 
 V1 intentionally uses a compact event vocabulary that can be mapped from legacy
@@ -238,6 +262,13 @@ Trace a canonical entity back to source evidence:
 
 ```http
 GET /api/v2/genealogy/canonical/UNIT/WAFER_401
+```
+
+Project canonical state into the spatial twin:
+
+```http
+GET /api/v2/factory-twin/snapshot?source=CANONICAL_TWIN&run_id=RUN_...&at_time=10
+GET /api/v2/factory-twin/replay-range?run_id=RUN_...
 ```
 
 This executes:

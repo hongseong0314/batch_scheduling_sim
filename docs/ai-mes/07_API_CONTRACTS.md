@@ -1,7 +1,7 @@
 # API Contracts
 
 Status: canonical
-Last updated: 2026-06-12
+Last updated: 2026-07-17
 
 ## Reader
 
@@ -63,6 +63,7 @@ legacy boundary".
 | run and ledger index routes | `src/mes/runtime/run_ledger_api.py`, `src/mes/runtime/run_ledger.py` |
 | equipment detail | `src/mes/runtime/equipment_detail.py` |
 | equipment agent telemetry | `src/mes/runtime/equipment_telemetry.py` |
+| factory spatial twin layout, state, and stream | `src/mes/runtime/factory_twin_api.py`, `src/mes/factory_twin/` |
 | Gantt state | `src/mes/runtime/gantt.py` |
 
 ## Current Read APIs
@@ -124,6 +125,59 @@ legacy boundary".
 | `GET /api/v2/process-chat/models` | Continue-style chat model catalog for process chat |
 | `GET /api/v2/agent-runs` | Recent Agent Mode and local fallback run records |
 | `GET /api/v2/agent-runs/{agent_run_id}` | Agent run detail with metadata, tool calls, and step trace |
+| `GET /api/v2/factory-twin/layout` | Stable operation/equipment/queue/route/warehouse spatial layout |
+| `GET /api/v2/factory-twin/snapshot` | Full `SIMULATOR` or `CANONICAL_TWIN` spatial state projection |
+| `GET /api/v2/factory-twin/entity/{entity_type}/{entity_id}` | Layout and state evidence for one spatial entity |
+| `GET /api/v2/factory-twin/replay-range` | Canonical event-time range for one run |
+
+## Factory Spatial Twin APIs
+
+All spatial twin payloads use:
+
+```text
+schema_version: factory-twin.v1
+```
+
+Layout is separate from frequently changing state:
+
+```http
+GET /api/v2/factory-twin/layout
+GET /api/v2/factory-twin/snapshot?source=SIMULATOR
+GET /api/v2/factory-twin/snapshot?source=CANONICAL_TWIN&run_id=RUN_...&at_time=10
+```
+
+A snapshot includes exact equipment, queue, work-item, carrier, transfer, and
+warehouse state plus `state_source`, `spatial_source`, and `transport_source`.
+Missing canonical evidence is returned as `UNKNOWN`, not silently converted to
+idle.
+
+Entity inspection uses the same identifiers as MES traceability:
+
+```http
+GET /api/v2/factory-twin/entity/equipment/A_0
+GET /api/v2/factory-twin/entity/task/101
+GET /api/v2/factory-twin/entity/carrier/CARRIER_000001
+```
+
+Canonical replay controls query the available event-time range:
+
+```http
+GET /api/v2/factory-twin/replay-range?run_id=RUN_...
+```
+
+Live simulator updates use:
+
+```http
+WS /api/v2/factory-twin/stream?source=SIMULATOR&schema=factory-twin.v1
+```
+
+Message types are `hello`, `snapshot`, `delta`, `heartbeat`, and
+`resync_required`. A delta is valid only when `base_sequence` equals the
+client's current sequence. WebSocket failure falls back to read-only snapshot
+polling and does not stop the simulator.
+
+See [22_FACTORY_SPATIAL_DIGITAL_TWIN.md](22_FACTORY_SPATIAL_DIGITAL_TWIN.md) for
+the complete contract and page workflow.
 
 ## Current Mutation APIs
 

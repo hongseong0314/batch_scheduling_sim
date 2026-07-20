@@ -19,6 +19,12 @@ from src.mes.action_proposals import (
     outcome_record_from_payload,
 )
 from src.mes.legacy_adapters import legacy_adapter_catalog, legacy_adapter_payload
+from src.mes.jobs.ingestion_jobs import (
+    backfill_ingestion,
+    ingestion_job_catalog,
+    ingestion_job_runs_payload,
+    run_ingestion_batch,
+)
 from src.mes.runtime.legacy_ingestion import (
     canonical_ingestion_records_payload,
     ingest_source_record_payload,
@@ -60,11 +66,13 @@ def build_production_boundary_router(context: Any) -> APIRouter:
     def production_data_quality(
         run_id: Optional[str] = Query(None),
         at_time: Optional[int] = Query(None, ge=0),
+        late_threshold: int = Query(24, ge=0),
     ) -> Dict[str, Any]:
         return production_data_quality_payload(
             context,
             run_id=run_id,
             at_time=at_time,
+            late_threshold=late_threshold,
         )
 
     @router.get("/api/v2/action-proposals")
@@ -218,6 +226,38 @@ def build_production_boundary_router(context: Any) -> APIRouter:
     @router.get("/api/v2/legacy-adapters")
     def legacy_adapters() -> Dict[str, Any]:
         return legacy_adapter_catalog()
+
+    @router.get("/api/v2/ingestion/jobs")
+    def ingestion_jobs() -> Dict[str, Any]:
+        return ingestion_job_catalog(context)
+
+    @router.get("/api/v2/ingestion/jobs/runs")
+    def ingestion_job_runs() -> Dict[str, Any]:
+        return ingestion_job_runs_payload(context)
+
+    @router.post("/api/v2/ingestion/jobs/run")
+    def run_ingestion_job(payload: Dict[str, Any] = Body(default_factory=dict)) -> Dict[str, Any]:
+        mode = str(payload.get("mode") or "DELTA").upper()
+        if mode == "BACKFILL":
+            return backfill_ingestion(
+                context,
+                adapter_id=str(payload["adapter_id"]),
+                rows=list(payload.get("rows") or []),
+                job_id=str(payload.get("job_id") or ""),
+                window_start=payload.get("window_start"),
+                window_end=payload.get("window_end"),
+                metadata=dict(payload.get("metadata") or {}),
+            )
+        return run_ingestion_batch(
+            context,
+            adapter_id=str(payload["adapter_id"]),
+            rows=list(payload.get("rows") or []),
+            job_id=str(payload.get("job_id") or ""),
+            mode=mode,
+            window_start=payload.get("window_start"),
+            window_end=payload.get("window_end"),
+            metadata=dict(payload.get("metadata") or {}),
+        )
 
     @router.post("/api/v2/legacy-adapters/{adapter_id}/ingest")
     def ingest_legacy_adapter_row(

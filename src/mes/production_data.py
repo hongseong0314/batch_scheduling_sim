@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from src.mes.domain import SourceKeyMapping
 from src.mes.ingestion import CanonicalIngestionRecord, RawSourceRecord
+from src.mes.persistence.postgres_schema import postgres_schema_contract
 
 
 PRODUCTION_SCHEMA_VERSION = "canonical-production-data-v1"
@@ -39,6 +40,7 @@ def canonical_schema_contract(
         "schema_version": PRODUCTION_SCHEMA_VERSION,
         "status": "POSTGRESQL_READY_CONTRACT_DRAFT",
         "storage_target": "postgresql",
+        "postgresql": postgres_schema_contract(),
         "current_mvp_backend": {
             "backend": "sqlite_json_plus_indexes",
             "schema_version": sqlite_schema_version,
@@ -75,6 +77,7 @@ def data_quality_diagnostics(
     mappings: Iterable[SourceKeyMapping],
     operation_ids: Optional[Sequence[str]] = None,
     at_time: Optional[int] = None,
+    late_threshold: int = 24,
 ) -> Dict[str, Any]:
     """Inspect raw/canonical/mapping records for production data readiness."""
     raw_items = list(raw_records)
@@ -235,6 +238,9 @@ def data_quality_diagnostics(
                 entity_type=entity_type,
             )
 
+    _append_late_event_issues(issues, canonical_items, late_threshold=late_threshold)
+    _append_out_of_order_event_issues(issues, canonical_items)
+
     severities = {issue["severity"] for issue in issues}
     status = "ERROR" if "ERROR" in severities else "WARN" if "WARN" in severities else "OK"
     if not raw_items and not canonical_items and not mapping_items:
@@ -252,11 +258,13 @@ def data_quality_diagnostics(
     )
     entity_counts = _entity_counts(canonical_items)
     operation_counts = _operation_counts(canonical_items)
+    issue_groups = _issue_groups(issues)
 
     return {
         "schema_version": PRODUCTION_SCHEMA_VERSION,
         "status": status,
         "at_time": at_time,
+        "late_threshold": int(late_threshold),
         "counts": {
             "raw_records": len(raw_items),
             "canonical_records": len(canonical_items),
@@ -283,6 +291,8 @@ def data_quality_diagnostics(
                 else None
             ),
         },
+        "dashboard": _dashboard_summary(status, issues, issue_groups),
+        "issue_groups": issue_groups,
         "issue_count": len(issues),
         "issues": issues,
         "recommended_actions": _recommended_actions(status, issues),
@@ -485,6 +495,124 @@ def _validate_record_times(
             event_time=event_time,
             ingest_time=ingest_time,
         )
+
+
+def _append_late_event_issues(
+    issues: List[Dict[str, Any]],
+    records: Sequence[CanonicalIngestionRecord],
+    late_threshold: int,
+) -> None:
+    threshold = max(0, int(late_threshold))
+    for record in records:
+        if record.event_time is None or record.ingest_time is None:
+            continue
+        lag = int(record.ingest_time) - int(record.event_time)
+        if lag > threshold:
+            _issue(
+                issues,
+                "WARN",
+                "LATE_ARRIVING_CANONICAL_EVENT",
+                "Canonical event arrived after the configured freshness threshold.",
+                record_id=record.record_id,
+                canonical_id=record.canonical_id,
+                entity_type=record.entity_type,
+                event_time=record.event_time,
+                ingest_time=record.ingest_time,
+                lag=lag,
+                late_threshold=threshold,
+            )
+
+
+def _append_out_of_order_event_issues(
+    issues: List[Dict[str, Any]],
+    records: Sequence[CanonicalIngestionRecord],
+) -> None:
+    by_run: Dict[str, List[CanonicalIngestionRecord]] = defaultdict(list)
+    for record in records:
+        by_run[record.run_id].append(record)
+    for run_id, items in by_run.items():
+        ordered_by_ingest = sorted(
+            items,
+            key=lambda record: int(
+                record.ingest_time if record.ingest_time is not None else record.event_time or 0
+            ),
+        )
+        max_event_time: Optional[int] = None
+        max_record_id = ""
+        for record in ordered_by_ingest:
+            event_time = record.event_time
+            if event_time is None:
+                continue
+            current = int(event_time)
+            if max_event_time is not None and current < max_event_time:
+                _issue(
+                    issues,
+                    "WARN",
+                    "OUT_OF_ORDER_CANONICAL_EVENT",
+                    "Canonical event arrived after a newer event for the same run.",
+                    run_id=run_id,
+                    record_id=record.record_id,
+                    previous_record_id=max_record_id,
+                    event_time=current,
+                    previous_event_time=max_event_time,
+                )
+            if max_event_time is None or current > max_event_time:
+                max_event_time = current
+                max_record_id = record.record_id
+
+
+def _issue_groups(issues: Sequence[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    groups: Dict[str, Dict[str, Any]] = {}
+    for issue in issues:
+        code = str(issue.get("code") or "UNKNOWN")
+        group = groups.setdefault(
+            code,
+            {
+                "code": code,
+                "count": 0,
+                "severity": str(issue.get("severity") or "WARN"),
+            },
+        )
+        group["count"] += 1
+        if issue.get("severity") == "ERROR":
+            group["severity"] = "ERROR"
+    return groups
+
+
+def _dashboard_summary(
+    status: str,
+    issues: Sequence[Dict[str, Any]],
+    issue_groups: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    def count(code: str) -> int:
+        return int(issue_groups.get(code, {}).get("count", 0) or 0)
+
+    missing_count = sum(
+        1
+        for issue in issues
+        if str(issue.get("code", "")).startswith("MISSING_")
+        or str(issue.get("code", "")).endswith("_NOT_FOUND")
+    )
+    duplicate_count = sum(
+        int(group.get("count", 0))
+        for code, group in issue_groups.items()
+        if "DUPLICATE" in code
+    )
+    conflict_count = sum(
+        int(group.get("count", 0))
+        for code, group in issue_groups.items()
+        if "CONFLICT" in code
+    )
+    return {
+        "readiness_status": status,
+        "blocking_issue_count": sum(1 for issue in issues if issue.get("severity") == "ERROR"),
+        "warning_count": sum(1 for issue in issues if issue.get("severity") == "WARN"),
+        "missing_count": missing_count,
+        "duplicate_count": duplicate_count,
+        "conflict_count": conflict_count,
+        "late_event_count": count("LATE_ARRIVING_CANONICAL_EVENT"),
+        "out_of_order_event_count": count("OUT_OF_ORDER_CANONICAL_EVENT"),
+    }
 
 
 def _issue(
